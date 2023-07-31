@@ -477,6 +477,7 @@ export default class Downloader {
 
 			return response
 		}catch(error){
+			// TODO: Handle axios errors in test mode to prevent token's leakage
 			if(error instanceof AxiosError){
 				if(error.response){
 					await handleCookies()
@@ -502,7 +503,7 @@ export default class Downloader {
 	Log(...args){
 		if(isTesting) return
 
-		const date = new Date().toLocaleString("pt-BR")
+		const date = new Date().toLocaleString("pt-BR").split(", ")[1]
 
 		if(args.length === 1 && args[0] instanceof Error) return console.error(chalk.redBright(`[${date}] ${args[0].message}`))
 

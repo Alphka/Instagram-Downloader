@@ -1,8 +1,8 @@
 {
-	"author": "Alphka",
+	"author": "Kayo Souza",
 	"name": "insta-downloader",
 	"version": "2.0.2",
-	"description": "An application to download content of Instagram with the correct modified date",
+	"description": "An application to download content from Instagram",
 	"main": "src/index.js",
 	"scripts": {
 		"start": "node --no-warnings .",
@@ -14,6 +14,7 @@
 		"instagram",
 		"download",
 		"lastModified",
+		"images",
 		"photos",
 		"videos"
 	],
@@ -43,7 +44,7 @@
 	},
 	"engines": {
 		"npm": "^8.19.4 || >=9.8.1",
-		"node": "^16.19 || ^18.13 || ^19.2 || >=20.5"
+		"node": "^16.19 || ^18.13 || ^19.2 || >=20"
 	},
 	"license": "ISC",
 	"type": "module"
