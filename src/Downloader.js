@@ -479,9 +479,8 @@ export default class Downloader {
 		}catch(error){
 			if(error instanceof AxiosError){
 				if(error.response){
-					response = error.response
 					await handleCookies()
-					return response
+					return error.response
 				}
 			}
 
@@ -503,11 +502,10 @@ export default class Downloader {
 	Log(...args){
 		if(isTesting) return
 
-		const date = new Date(new Date().toString().replace(/GMT-\d{4}/, "GMT-0000")).toISOString().split("T")[1].substring(0, 8)
+		const date = new Date().toLocaleString("pt-BR")
 
 		if(args.length === 1 && args[0] instanceof Error) return console.error(chalk.redBright(`[${date}] ${args[0].message}`))
 
-		process.stdout.write(chalk.blackBright(`[${date}] `))
-		console.log(...args)
+		console.log(chalk.blackBright(`[${date}] `), ...args)
 	}
 }
