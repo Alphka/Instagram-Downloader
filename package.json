@@ -26,10 +26,15 @@
 	"devDependencies": {
 		"@types/mime": "^3.0.1",
 		"@types/node": "^20.4.5",
-		"@types/sharp": "^0.31.1"
+		"@types/sharp": "^0.31.1",
+		"typescript": "^5.1.6"
 	},
 	"bin": {
 		"instadl": "src/index.js"
+	},
+	"engines": {
+		"npm": ">=8",
+		"node": ">=16"
 	},
 	"type": "module"
 }

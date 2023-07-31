@@ -1,0 +1,35 @@
+name: Node.js CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node-version: [16.x, 18.x, 20.x]
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+      - name: Install dependencies
+        run: npm ci --fund=false
+      - name: Type checking
+        run: npx tsc -p jsconfig.json
+      - name: Test project
+        run: npm test
+        env:
+          TOKEN: ${{ secrets.TOKEN }}
+          USER_ID: ${{ secrets.USERID }}
+          SESSION_ID: ${{ secrets.SESSIONID }}

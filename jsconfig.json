@@ -13,7 +13,8 @@
 		"typeRoots": [
 			"node_modules/@types",
 			"src/typings"
-		]
+		],
+		"noEmit": true
 	},
 	"exclude": [
 		"node_modules",
