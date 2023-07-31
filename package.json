@@ -1,7 +1,7 @@
 {
 	"author": "Alphka",
 	"name": "insta-downloader",
-	"version": "2.0.1",
+	"version": "2.0.2",
 	"description": "An application to download content of Instagram with the correct modified date",
 	"main": "src/index.js",
 	"scripts": {
@@ -30,12 +30,21 @@
 		"@types/sharp": "^0.31.1",
 		"typescript": "^5.1.6"
 	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/Alphka/Instagram-Downloader.git"
+	},
+	"bugs": {
+		"url": "https://github.com/Alphka/Instagram-Downloader/issues"
+	},
+	"homepage": "https://github.com/Alphka/Instagram-Downloader#readme",
 	"bin": {
 		"instadl": "src/index.js"
 	},
 	"engines": {
-		"npm": ">=8",
-		"node": ">=16"
+		"npm": "^8.19.4 || >=9.8.1",
+		"node": "^16.19 || ^18.13 || ^19.2 || >=20.5"
 	},
+	"license": "ISC",
 	"type": "module"
 }
