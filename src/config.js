@@ -1,0 +1,6 @@
+export const BASE_URL = "https://www.instagram.com"
+export const API_QUERY = "/graphql/query"
+export const API_REELS = "/api/v1/feed/reels_media"
+export const API_FEED_TEMPLATE = "/api/v1/feed/user/<username>/username"
+export const API_USERID_TEMPLATE = "/api/v1/users/web_profile_info/?username=<username>"
+export const API_FACEBOOK_ACCOUNT = "/api/v1/web/fxcal/ig_sso_users/"

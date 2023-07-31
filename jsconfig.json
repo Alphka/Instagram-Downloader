@@ -1,0 +1,29 @@
+{
+	"compilerOptions": {
+		"module": "NodeNext",
+		"target": "ESNext",
+		"moduleResolution": "NodeNext",
+		"resolveJsonModule": true,
+		"checkJs": true,
+		"strict": true,
+		"noImplicitAny": false,
+		"strictNullChecks": false,
+		"strictPropertyInitialization": false,
+		"lib": ["ESNext"],
+		"typeRoots": [
+			"node_modules/@types",
+			"src/typings"
+		]
+	},
+	"exclude": [
+		"node_modules",
+		"output"
+	],
+	"include": [
+		"src",
+		"tests/*.test.js"
+	],
+	"typeAcquisition": {
+		"enable": true
+	}
+}
