@@ -55,6 +55,7 @@ test("Instagram API", async t => {
 
 	await t.test("should get app id", async () => {
 		await downloader.CheckServerConfig()
+		downloader.UpdateHeaders()
 
 		const { app_id, queryHash } = downloader.config
 

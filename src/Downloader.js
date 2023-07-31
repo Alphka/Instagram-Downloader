@@ -415,7 +415,7 @@ export default class Downloader {
 			Object.assign(config, { responseType: "arraybuffer" })
 
 			/** @type {import("axios").AxiosResponse<Buffer>} */
-			const { data } = await axios.get(url, config)
+			const { data } = await this.Request(url, "GET", config)
 			const { format } = await sharp(data).metadata()
 			const path = join(folder, `${name}.${format === "jpeg" ? "jpg" : format}`)
 
@@ -428,7 +428,7 @@ export default class Downloader {
 		Object.assign(config, { responseType: "stream" })
 
 		/** @type {import("axios").AxiosResponse<import("stream").PassThrough>} */
-		const { data } = await axios.get(url, config)
+		const { data } = await this.Request(url, "GET", config)
 		const path = join(folder, filename)
 		const file = createWriteStream(path)
 
@@ -494,7 +494,7 @@ export default class Downloader {
 		if(config.app_id && config.queryHash) return
 
 		const response = await this.Request(new URL(usernames[0], BASE_URL), "GET", { responseType: "text" })
-		const appId = response.data.match(/X-IG-App-ID":"(\d+)"/)?.[1]
+		const appId = response.data.match(/"X-IG-App-ID":"(\d+)"/)?.[1]
 		const queryHash = response.data.match(/"query_hash":"([a-z0-9]+)"/)?.[1]
 
 		config.queryHash = queryHash

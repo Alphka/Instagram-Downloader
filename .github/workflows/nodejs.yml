@@ -26,7 +26,7 @@ jobs:
       - name: Install dependencies
         run: npm ci --fund=false
       - name: Type checking
-        run: npx tsc -p jsconfig.json
+        run: npm run lint
       - name: Test project
         run: npm test
         env:

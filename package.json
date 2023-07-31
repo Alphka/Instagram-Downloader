@@ -1,13 +1,14 @@
 {
 	"author": "Alphka",
 	"name": "insta-downloader",
-	"version": "2.0.0",
+	"version": "2.0.1",
 	"description": "An application to download content of Instagram with the correct modified date",
 	"main": "src/index.js",
 	"scripts": {
 		"start": "node --no-warnings .",
 		"test": "node --no-warnings --test tests/",
-		"test:watch": "node --no-warnings --test --watch tests/"
+		"test:watch": "node --no-warnings --test --watch tests/",
+		"lint": "tsc -p jsconfig.json"
 	},
 	"keywords": [
 		"instagram",
