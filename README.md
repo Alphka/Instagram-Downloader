@@ -40,4 +40,4 @@ npm link
 
 ### License
 
-[ISC](LICENSE) © 2023 Kayo Souza
+[ISC](LICENSE.md) © 2023 Kayo Souza
