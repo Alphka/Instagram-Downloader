@@ -37,3 +37,7 @@ Arguments:
 npm install
 npm link
 ```
+
+### License
+
+[ISC](LICENSE) © 2023 Kayo Souza
