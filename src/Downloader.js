@@ -80,8 +80,6 @@ export default class Downloader {
 		this.GetConfig()
 		this.UpdateHeaders()
 
-		// TODO: Add stories download
-
 		do{
 			try{
 				await this.CheckServerConfig()
@@ -130,7 +128,8 @@ export default class Downloader {
 
 			const results = await Promise.allSettled([
 				timeline && this.DownloadTimeline(username, folder),
-				highlights && this.DownloadHighlights(user_id, folder, cover)
+				highlights && this.DownloadHighlights(user_id, folder, cover),
+				stories && this.DownloadStories(user_id, folder)
 			])
 
 			for(const result of results){
@@ -179,18 +178,15 @@ export default class Downloader {
 	/** @param {string} user_id */
 	async GetHighlights(user_id){
 		const url = new URL(API_QUERY, BASE_URL)
-		const data = new URLSearchParams
 
-		data.set("query_hash", this.config.queryHash)
-		data.set("user_id", user_id)
-		data.set("include_chaining", "false")
-		data.set("include_reel", "false")
-		data.set("include_suggested_users", "false")
-		data.set("include_logged_out_extras", "false")
-		data.set("include_live_status", "false")
-		data.set("include_highlight_reels", "true")
-
-		url.search = data.toString()
+		url.searchParams.set("query_hash", this.config.queryHash)
+		url.searchParams.set("user_id", user_id)
+		url.searchParams.set("include_chaining", "false")
+		url.searchParams.set("include_reel", "false")
+		url.searchParams.set("include_suggested_users", "false")
+		url.searchParams.set("include_logged_out_extras", "false")
+		url.searchParams.set("include_live_status", "false")
+		url.searchParams.set("include_highlight_reels", "true")
 
 		/** @type {import("axios").AxiosResponse<import("./typings/api.js").QueryHighlightsResponse>} */
 		const response = await this.Request(url, "GET", {
@@ -200,14 +196,11 @@ export default class Downloader {
 
 		return response.data.data.user.edge_highlight_reels.edges.map(({ node }) => node)
 	}
-	/** @param {string[]} reelsIds */
+	/** @param {`${number}`[]} reelsIds */
 	async GetHighlightsContents(reelsIds){
 		const url = new URL(API_REELS, BASE_URL)
-		const data = new URLSearchParams
 
-		for(const id of reelsIds) data.append("reel_ids", "highlight:" + id)
-
-		url.search = data.toString()
+		for(const id of reelsIds) url.searchParams.append("reel_ids", "highlight:" + id)
 
 		/** @type {import("axios").AxiosResponse<import("./typings/api.js").HighlightsAPIResponse>} */
 		const response = await this.Request(url, "GET", {
@@ -215,6 +208,23 @@ export default class Downloader {
 		})
 
 		return response.data.reels_media
+	}
+	/** @param {`${number}`} userId */
+	async GetStories(userId){
+		const url = new URL(API_REELS, BASE_URL)
+
+		url.searchParams.set("reel_ids", userId)
+
+		/** @type {import("axios").AxiosResponse<import("./typings/api.js").StoriesAPIResponse>} */
+		const response = await this.Request(url, "GET", {
+			responseType: "json"
+		})
+
+		const { reels, reels_media } = response.data
+
+		if(!reels_media.length) return null
+
+		return response.data.reels[userId]
 	}
 	/**
 	 * @param {string} user_id
@@ -233,7 +243,6 @@ export default class Downloader {
 
 		if(hasHighlights && !existsSync(folder)) await mkdir(folder, { recursive: true })
 
-		this.Log("Downloading highlights")
 		while(highlights.length && limit > count){
 			const ids = highlights.splice(0, 10).map(({ id }) => id)
 			const highlightsContents = await this.GetHighlightsContents(ids)
@@ -246,10 +255,7 @@ export default class Downloader {
 			}
 
 			for(const { id, items } of highlightsContents){
-				if(count > limit){
-					console.log("Should not be here")
-					break
-				}
+				if(count > limit) throw new Error("Unexpected error")
 
 				const highlightId = /** @type {`${number}`} */ (id.substring(id.indexOf(":") + 1))
 
@@ -293,6 +299,35 @@ export default class Downloader {
 		}else this.Log("No highlights found")
 	}
 	/**
+	 * @param {string} user_id
+	 * @param {string} folder
+	 * @param {number} [limit]
+	 */
+	async DownloadStories(user_id, folder, limit = Infinity){
+		const results = await this.GetStories(/** @type {`${number}`} */ (user_id))
+
+		if(!results) return this.Log("No stories found")
+
+		const { items: stories } = results
+
+		if(stories.length){
+			if(!existsSync(folder)) await mkdir(folder, { recursive: true })
+			this.Log("Downloading stories")
+		}
+
+		let count = 0
+
+		while(stories.length && limit > count){
+			const items = stories.splice(0, 10)
+			const data = { count, limit }
+			const { limited } = await this.DownloadItems(items, folder, data)
+
+			count = data.count
+
+			if(limited) break
+		}
+	}
+	/**
 	 * @param {string} username
 	 * @param {string} folder
 	 * @param {number} [limit]
@@ -304,10 +339,10 @@ export default class Downloader {
 
 		/** @type {string} */
 		let lastId
+		let first = true
 		let count = 0
 		let hasMore = true
 
-		this.Log("Downloading timeline")
 		while(hasMore && limit > count){
 			if(lastId) url.searchParams.set("max_id", lastId)
 
@@ -316,6 +351,8 @@ export default class Downloader {
 			const { more_available, num_results, next_max_id, items } = response.data
 
 			if(num_results === 0) break
+
+			if(first) this.Log("Downloading timeline"), first = false
 
 			if(!existsSync(folder)) await mkdir(folder, { recursive: true })
 
@@ -505,7 +542,11 @@ export default class Downloader {
 
 		const date = new Date().toLocaleString("pt-BR").split(", ")[1]
 
-		if(args.length === 1 && args[0] instanceof Error) return console.error(chalk.redBright(`[${date}] ${args[0].message}`))
+		if(args.length === 1){
+			const arg = args[0]
+			if(arg instanceof Error) return console.error(chalk.redBright(`[${date}] ${args[0].message}`))
+			if(typeof arg === "string") return console.log(`${chalk.blackBright(`[${date}]`)} ${arg}`)
+		}
 
 		console.log(chalk.blackBright(`[${date}] `), ...args)
 	}

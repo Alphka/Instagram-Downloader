@@ -24,6 +24,7 @@ Arguments:
 
 -o, --output               Output directory
 -f, --force                Force creation of output directory
+--no-stories               Disable stories download
 --no-timeline              Disable timeline download
 --no-highlights            Disable hightlights download
 --no-cover                 Disable hightlights' cover download

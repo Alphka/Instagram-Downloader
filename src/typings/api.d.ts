@@ -1,5 +1,9 @@
 export interface APIHeaders {
 	[key: string]: string
+	"viewport-width"?: string
+	"X-Ig-Www-Claim"?: string
+	"X-Requested-With"?: "XMLHttpRequest"
+	"X-Asbd-Id"?: string
 	"X-Ig-App-Id"?: string
 	"X-Csrftoken"?: string
 	Cookie?: string
@@ -169,11 +173,11 @@ export interface FeedItem {
 		id: string
 		media_type: number
 		image_versions2: {
-			candidates: Array<{
+			candidates: {
 				width: number
 				height: number
 				url: string
-			}>
+			}[]
 		}
 		original_width: number
 		original_height: number
@@ -181,7 +185,7 @@ export interface FeedItem {
 		pk: string
 		carousel_parent_id: string
 		usertags?: {
-			in: Array<{
+			in: {
 				user: {
 					pk: string
 					pk_id: string
@@ -192,10 +196,10 @@ export interface FeedItem {
 					profile_pic_url: string
 					profile_pic_id?: string
 				}
-				position: Array<number>
+				position: number[]
 				start_time_in_video_in_sec: any
 				duration_in_video_in_sec: any
-			}>
+			}[]
 		}
 		commerciality_status: string
 		sharing_friction_info: {
@@ -203,13 +207,13 @@ export interface FeedItem {
 			bloks_app_url: any
 			sharing_friction_payload: any
 		}
-		video_versions?: Array<{
+		video_versions?: {
 			type: number
 			width: number
 			height: number
 			url: string
 			id: string
-		}>
+		}[]
 		video_duration?: number
 		is_dash_eligible?: number
 		video_dash_manifest?: string
@@ -411,8 +415,8 @@ export interface Reel {
 	__typename: "GraphReel"
 }
 
-export interface ReelNode {
-	id: string
+export interface ReelChainNode {
+	id: `${number}`
 	blocked_by_viewer: boolean
 	restricted_by_viewer: boolean
 	followed_by_viewer: boolean
@@ -460,7 +464,7 @@ export interface QueryHighlightsResponse {
 			/** Suggested users */
 			edge_chaining: {
 				edges: {
-					node: ReelNode
+					node: ReelChainNode
 				}[]
 			}
 			edge_highlight_reels: {
@@ -479,6 +483,18 @@ export interface QueryHighlightsResponse {
 					}
 				}[]
 			}
+			has_public_story?: boolean
+			is_live?: boolean
+			reel?: {
+				expiring_at: number
+				has_pride_media: boolean
+				id: `${number}`
+				latest_reel_media: number
+				owner: ReelOwner
+				seen: boolean | null
+				user: ReelUser
+				__typename: "GraphReel"
+			}
 		}
 	}
 	extensions?: {
@@ -495,7 +511,7 @@ export interface QueryTimelineAPIResponse {
 				has_previous_page: boolean
 				has_next_page: boolean
 			}
-			edges: Array<{
+			edges: {
 				node: {
 					media?: {
 						taken_at: number
@@ -514,13 +530,13 @@ export interface QueryTimelineAPIResponse {
 						commerciality_status: string
 						is_paid_partnership: boolean
 						is_visual_reply_commenter_notice_enabled: boolean
-						clips_tab_pinned_user_ids: Array<any>
+						clips_tab_pinned_user_ids: any[]
 						has_delayed_metadata: boolean
 						comment_likes_enabled: boolean
 						comment_threading_enabled: boolean
 						max_num_visible_preview_comments: number
 						has_more_comments: boolean
-						preview_comments: Array<any>
+						preview_comments: any[]
 						photo_of_you: boolean
 						is_organic_product_tagging_eligible: boolean
 						can_see_insights_as_brand: boolean
@@ -553,14 +569,14 @@ export interface QueryTimelineAPIResponse {
 							}
 							profile_pic_id: string
 							profile_pic_url: string
-							account_badges: Array<any>
+							account_badges: any[]
 							latest_reel_media: number
 						}
 						can_viewer_reshare: boolean
 						like_count: number
 						fb_like_count?: number
 						has_liked: boolean
-						top_likers: Array<string>
+						top_likers: string[]
 						facepile_top_likers: GenericUser[]
 						preview: string
 						image_versions2: {
@@ -586,13 +602,13 @@ export interface QueryTimelineAPIResponse {
 						video_dash_manifest?: string
 						video_codec?: string
 						number_of_qualities?: number
-						video_versions?: Array<{
+						video_versions?: {
 							type: number
 							width: number
 							height: number
 							url: string
 							id: string
-						}>
+						}[]
 						has_audio?: boolean
 						video_duration?: number
 						can_viewer_save: boolean
@@ -645,7 +661,7 @@ export interface QueryTimelineAPIResponse {
 							connected_group_id: string
 							remember_group_choice: boolean
 							style: any
-							groups: Array<{
+							groups: {
 								id: string
 								title: string
 								show_group_text: string
@@ -715,21 +731,21 @@ export interface QueryTimelineAPIResponse {
 											}
 											profile_pic_id: string
 											profile_pic_url: string
-											account_badges: Array<any>
+											account_badges: any[]
 											latest_reel_media: number
 										}
 										can_viewer_reshare: boolean
 										like_count: number
 										has_liked: boolean
-										top_likers: Array<any>
-										facepile_top_likers: Array<any>
+										top_likers: any[]
+										facepile_top_likers: any[]
 										preview: string
 										image_versions2: {
-											candidates: Array<{
+											candidates: {
 												width: number
 												height: number
 												url: string
-											}>
+											}[]
 										}
 										original_width: number
 										original_height: number
@@ -798,7 +814,7 @@ export interface QueryTimelineAPIResponse {
 										ranking_weight: number
 										can_view_more_preview_comments: boolean
 										hide_view_all_comment_entrypoint: boolean
-										comments: Array<any>
+										comments: any[]
 										comment_count: number
 										inline_composer_display_condition: string
 									}
@@ -821,13 +837,13 @@ export interface QueryTimelineAPIResponse {
 											commerciality_status: string
 											is_paid_partnership: boolean
 											is_visual_reply_commenter_notice_enabled: boolean
-											clips_tab_pinned_user_ids: Array<any>
+											clips_tab_pinned_user_ids: any[]
 											has_delayed_metadata: boolean
 											comment_likes_enabled: boolean
 											comment_threading_enabled: boolean
 											max_num_visible_preview_comments: number
 											has_more_comments: boolean
-											preview_comments: Array<any>
+											preview_comments: any[]
 											photo_of_you: boolean
 											is_organic_product_tagging_eligible: boolean
 											can_see_insights_as_brand: boolean
@@ -860,20 +876,20 @@ export interface QueryTimelineAPIResponse {
 												}
 												profile_pic_id: string
 												profile_pic_url: string
-												account_badges: Array<any>
+												account_badges: any[]
 											}
 											can_viewer_reshare: boolean
 											like_count: number
 											has_liked: boolean
-											top_likers: Array<any>
-											facepile_top_likers: Array<any>
+											top_likers: any[]
+											facepile_top_likers: any[]
 											preview: string
 											image_versions2: {
-												candidates: Array<{
+												candidates: {
 													width: number
 													height: number
 													url: string
-												}>
+												}[]
 											}
 											original_width: number
 											original_height: number
@@ -951,7 +967,7 @@ export interface QueryTimelineAPIResponse {
 												confirmation_title_style: string
 												undo_style: string
 												confirmation_style: string
-												followup_options: Array<{
+												followup_options: {
 													text: string
 													style: any
 													id: string
@@ -963,16 +979,16 @@ export interface QueryTimelineAPIResponse {
 														confirmation_body: string
 														undo_style: string
 														confirmation_title?: string
-														followup_options?: Array<{
+														followup_options?: {
 															text: string
 															id: string
 															style: string
 															show_icon: boolean
 															data: any
 															demotion_control: {}
-														}>
+														}[]
 													}
-												}>
+												}[]
 											}
 											recommendation_data: string
 											explore: {
@@ -980,10 +996,10 @@ export interface QueryTimelineAPIResponse {
 											}
 											can_view_more_preview_comments: boolean
 											hide_view_all_comment_entrypoint: boolean
-											comments: Array<any>
+											comments: any[]
 											comment_count: number
 											inline_composer_display_condition: string
-											timeline_pinned_user_ids?: Array<number>
+											timeline_pinned_user_ids?: number[]
 										}
 										id: string
 										inventory_source: string
@@ -991,12 +1007,12 @@ export interface QueryTimelineAPIResponse {
 								}[]
 								next_max_id: string
 								pagination_source: string
-							}>
+							}[]
 						}
 					}
 				}
 				cursor: string
-			}>
+			}[]
 		}
 	}
 	status: APIStatus
@@ -1081,6 +1097,7 @@ export interface FacebookAccountAPIResponse {
 export type ReplyTypes = "story_selfie_reply" | "story_remix_reply"
 
 export type HighlightId = `highlight:${number}`
+export type StoryId = `${number}`
 
 export interface HighlightCoverMedia {
 	cropped_image_version: ImageVersion & {
@@ -1096,64 +1113,47 @@ export interface HighlightUser extends Omit<GenericUser, "profile_grid_display_t
 	interop_messaging_user_fbid: number
 }
 
-export interface HighlightsAPIResponse<T extends string = HighlightId> {
+interface ReelMedia<T extends string = HighlightId> {
+	id: T
+	strong_id__: T
+	latest_reel_media: number
+	seen: boolean | null
+	can_reply: boolean
+	can_gif_quick_reply: boolean
+	can_reshare: boolean
+	can_react_with_avatar: boolean
+	reel_type: "highlight_reel"
+	ad_expiry_timestamp_in_millis: any
+	is_cta_sticker_available: any
+	app_sticker_info: any
+	should_treat_link_sticker_as_cta: any
+	cover_media: HighlightCoverMedia[]
+	user: HighlightUser[]
+	items: FeedItem[]
+	title: string
+	created_at: number
+	is_pinned_highlight: boolean
+	prefetch_count: number
+	media_count: number
+	media_ids: string[]
+	is_cacheable: boolean
+	is_converted_to_clips: boolean
+	disabled_reply_types: ReplyTypes[]
+	highlight_reel_type: string
+}
+
+export interface HighlightsAPIResponse {
 	reels: {
-		[highlightId: HighlightId]: {
-			id: T
-			strong_id__: T
-			latest_reel_media: number
-			seen: boolean | null
-			can_reply: boolean
-			can_gif_quick_reply: boolean
-			can_reshare: boolean
-			can_react_with_avatar: boolean
-			reel_type: "highlight_reel"
-			ad_expiry_timestamp_in_millis: any
-			is_cta_sticker_available: any
-			app_sticker_info: any
-			should_treat_link_sticker_as_cta: any
-			cover_media: HighlightCoverMedia[]
-			user: HighlightUser[]
-			items: FeedItem[]
-			title: string
-			created_at: number
-			is_pinned_highlight: boolean
-			prefetch_count: number
-			media_count: number
-			media_ids: string[]
-			is_cacheable: boolean
-			is_converted_to_clips: boolean
-			disabled_reply_types: ReplyTypes[]
-			highlight_reel_type: string
-		}
+		[highlightId: HighlightId]: ReelMedia<HighlightId>
 	}
-	reels_media: {
-		id: HighlightId
-		strong_id__: HighlightId
-		latest_reel_media: number
-		seen: boolean | null
-		can_reply: boolean
-		can_gif_quick_reply: boolean
-		can_reshare: boolean
-		can_react_with_avatar: boolean
-		reel_type: string
-		ad_expiry_timestamp_in_millis: any
-		is_cta_sticker_available: any
-		app_sticker_info: any
-		should_treat_link_sticker_as_cta: any
-		cover_media: HighlightCoverMedia[]
-		user: HighlightUser[]
-		items: FeedItem[]
-		title: string
-		created_at: number
-		is_pinned_highlight: boolean
-		prefetch_count: number
-		media_count: number
-		media_ids: string[]
-		is_cacheable: boolean
-		is_converted_to_clips: boolean
-		disabled_reply_types: ReplyTypes[]
-		highlight_reel_type: string
-	}[]
+	reels_media: ReelMedia<HighlightId>[]
+	status: APIStatus
+}
+
+export interface StoriesAPIResponse {
+	reels: {
+		[storyId: StoryId]: ReelMedia<StoryId>
+	}
+	reels_media: ReelMedia<StoryId>[]
 	status: APIStatus
 }
