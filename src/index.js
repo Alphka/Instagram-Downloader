@@ -1,11 +1,13 @@
-#!/usr/bin/env node
+#!/usr/bin/env node --no-warnings
 
 import { dirname, isAbsolute, join, relative, resolve } from "path"
 import { existsSync, mkdirSync } from "fs"
 import { fileURLToPath } from "url"
-import { parseArgs } from "util"
+import { program } from "commander"
+import packageConfig from "../package.json" assert { type: "json" }
 import Downloader from "./Downloader.js"
 import isNumber from "./helpers/isNumber.js"
+import config from "./config.js"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -14,87 +16,72 @@ const cwd = process.cwd()
 const args = process.argv.slice(2)
 const root = join(__dirname, "..")
 
-const { values, positionals } = parseArgs({
-	args,
-	options: {
-		output: {
-			type: "string",
-			short: "o",
-			default: cwd
-		},
-		force: {
-			type: "boolean",
-			short: "f"
-		},
-		limit: {
-			type: "string",
-			short: "l",
-			default: "15"
-		},
-		"no-timeline": {
-			type: "boolean"
-		},
-		"no-highlights": {
-			type: "boolean"
-		},
-		"no-cover": {
-			type: "boolean"
-		},
-		"no-stories": {
-			type: "boolean"
-		}
-	},
-	allowPositionals: true
+/**
+ * @param {string | undefined} directory
+ * @param {boolean} force
+ */
+function GetOutputDirectory(directory, force){
+	if(!directory) return GetOutputDirectory(process.cwd(), force)
+
+	const path = resolve(cwd, directory)
+	const relativePath = relative(root, path)
+
+	// If doesn't start with ".." and isn't on another disk
+	const isSubdir = !relativePath.startsWith("..") && !isAbsolute(relativePath)
+
+	if(path === root || isSubdir){
+		const path = join(root, "output")
+		if(!existsSync(path)) mkdirSync(path)
+		return path
+	}
+
+	if(!existsSync(path)){
+		if(!force) throw "Output folder doesn't exist. Use the --force flag to ignore this message"
+		mkdirSync(path, { recursive: true })
+	}
+
+	return path
+}
+
+const command = program
+	.name(packageConfig.bin && Object.keys(packageConfig.bin)[0] || packageConfig.name)
+	.version(packageConfig.version, "-v, --version", "Display program version")
+	.description(packageConfig.description)
+	.argument(config.argument.name, config.argument.description)
+	.helpOption("-h, --help", "Display help")
+	.action(
+		/**
+		 * @param {string} _arg
+		 * @param {import("./typings/index.js").Options} options
+		 * @param {import("commander").Command} command
+		 */
+		(_arg, options, command) => {
+		if(!command.args.length) throw "No usernames provided"
+		if(!options.highlights) options.hcover = false
+
+		const output = GetOutputDirectory(options.output, options.force)
+
+		new Downloader(command.args, isNumber(options.queue) ? Number(options.queue) : 12).Init({
+			output,
+			...options
+		})
+	})
+
+config.options.forEach(({ option, alternative, description, defaultValue, syntax }) => {
+	let flags = ""
+
+	if(alternative){
+		if(Array.isArray(alternative)) flags += alternative.map(command => "-" + command).join(", ")
+		else flags += "-" + alternative
+
+		if(option) flags += ", "
+	}
+
+	if(option) flags += "--" + option
+	if(syntax) flags += " " + syntax
+
+	// @ts-ignore
+	command.option(flags, description, defaultValue)
 })
 
-// TODO: Throw error when no-highlights, no-timeline and no-stories are true
-
-try{
-	const {
-		force,
-		"no-stories": noStories,
-		"no-timeline": noTimeline,
-		"no-highlights": noHighlights,
-		"no-cover": noCover,
-		output: _output,
-		limit: _limit
-	} = values
-
-	const usernames = positionals.map(name => name.trim()).filter(name => name.length)
-
-	if(!positionals.length) throw new SyntaxError("No username provided")
-	if(!usernames.length) throw new SyntaxError("Invalid username")
-	if(!isNumber(_limit)) throw new TypeError("Invalid limit")
-
-	const limit = Number(_limit)
-	const output = (() => {
-		const path = resolve(cwd, _output)
-		const relativePath = relative(root, path)
-		const isSubdir = !relativePath.startsWith("..") && !isAbsolute(relativePath)
-
-		if(path === root || isSubdir){
-			const path = join(root, "output")
-			mkdirSync(path, { recursive: true })
-			return path
-		}
-
-		if(!existsSync(path)){
-			if(!force) throw "Output folder doesn't exist. Use the --force flag to ignore this message"
-			mkdirSync(path, { recursive: true })
-		}
-
-		return path
-	})()
-
-	const index = new Downloader(usernames, limit)
-
-	index.Init({
-		output,
-		stories: !noStories,
-		timeline: !noTimeline,
-		highlights: !noHighlights,
-		cover: !noCover
-	})
-}catch(error){
-	console.error(error)
-}
+command.parse(process.argv)

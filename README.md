@@ -20,14 +20,18 @@ instadl [options] username1 username2
 Usage: instadl [options] <string>
 
 Arguments:
-  string                   Usernames
+  string                Usernames
 
--o, --output               Output directory
--f, --force                Force creation of output directory
---no-stories               Disable stories download
---no-timeline              Disable timeline download
---no-highlights            Disable hightlights download
---no-cover                 Disable hightlights' cover download
+Options:
+  -v, --version         Display program version
+  -o, --output [path]   Output directory
+  -f, --force           Force creation of output directory
+  -q, --queue <number>  Set how many items to get from Instagram API (default: 12)
+  -ns, --no-stories     Disable stories download
+  -nt, --no-timeline    Disable timeline download
+  -nh, --no-highlights  Disable highlights download
+  -nhc, --no-hcover     Disable highlights' cover download
+  -h, --help            Display help
 ```
 
 <hr>

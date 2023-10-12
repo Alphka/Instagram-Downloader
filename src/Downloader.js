@@ -73,9 +73,9 @@ export default class Downloader {
 	 * 	timeline?: boolean
 	 * 	highlights?: boolean
 	 * 	stories?: boolean
-	 * 	cover?: boolean
+	 * 	hcover?: boolean
 	 * }} data */
-	async Init({ output, timeline, highlights, cover, stories }){
+	async Init({ output, timeline, highlights, hcover, stories }){
 		this.Log("Initializing")
 		this.GetConfig()
 		this.UpdateHeaders()
@@ -128,7 +128,7 @@ export default class Downloader {
 
 			const results = await Promise.allSettled([
 				timeline && this.DownloadTimeline(username, folder),
-				highlights && this.DownloadHighlights(user_id, folder, cover),
+				highlights && this.DownloadHighlights(user_id, folder, hcover),
 				stories && this.DownloadStories(user_id, folder)
 			])
 
@@ -148,7 +148,7 @@ export default class Downloader {
 			responseType: "json"
 		})
 
-		if(typeof response.data === "object" && "status" in response.data){
+		if(typeof response?.data === "object" && "status" in response.data){
 			const { fbAccount, status } = response.data
 			if(status === "ok" && Boolean(fbAccount)) return
 		}
@@ -163,7 +163,7 @@ export default class Downloader {
 			responseType: "json"
 		})
 
-		if(typeof response.data === "object"){
+		if(typeof response?.data === "object" && "user" in response.data.data){
 			const { user } = response.data.data
 			return user
 		}
@@ -220,19 +220,20 @@ export default class Downloader {
 			responseType: "json"
 		})
 
-		const { reels, reels_media } = response.data
+		if(typeof response?.data === "object"){
+			const { reels, reels_media } = response.data
+			return reels_media.length ? reels[userId] : null
+		}
 
-		if(!reels_media.length) return null
-
-		return response.data.reels[userId]
+		return null
 	}
 	/**
 	 * @param {string} user_id
 	 * @param {string} folder
-	 * @param {boolean} [cover]
+	 * @param {boolean} [hcover]
 	 * @param {number} [limit]
 	 */
-	async DownloadHighlights(user_id, folder, cover, limit = Infinity){
+	async DownloadHighlights(user_id, folder, hcover, limit = Infinity){
 		const highlights = await this.GetHighlights(user_id)
 
 		const highlightsMap = new Map(highlights.map(reel => [reel.id, reel]))
@@ -266,7 +267,7 @@ export default class Downloader {
 					filesSet.add(GetURLFilename(url))
 				}
 
-				let shouldDownloadCover = cover && highlightsMap.has(highlightId)
+				const shouldDownloadCover = hcover && highlightsMap.has(highlightId)
 				let coverUrl
 
 				if(shouldDownloadCover){
@@ -348,22 +349,30 @@ export default class Downloader {
 
 			/** @type {import("axios").AxiosResponse<import("./typings/api.js").FeedAPIResponse>} */
 			const response = await this.Request(url)
-			const { more_available, num_results, next_max_id, items } = response.data
 
-			if(num_results === 0) break
+			if(typeof response?.data === "object"){
+				const { more_available, num_results, next_max_id, items } = response.data
 
-			if(first) this.Log("Downloading timeline"), first = false
+				if(num_results === 0) break
 
-			if(!existsSync(folder)) await mkdir(folder, { recursive: true })
+				if(first){
+					this.Log("Downloading timeline")
+					first = false
+				}
 
-			const data = { count, limit }
-			const { limited } = await this.DownloadItems(items, folder, data)
+				if(!existsSync(folder)){
+					await mkdir(folder, { recursive: true })
+				}
 
-			if(limited) break
+				const data = { count, limit }
+				const { limited } = await this.DownloadItems(items, folder, data)
 
-			hasMore = more_available
-			lastId = next_max_id
-			count = data.count
+				if(limited) break
+
+				hasMore = more_available
+				lastId = next_max_id
+				count = data.count
+			}else this.Log(new Error("Failed to get timeline, lastId: " + (lastId || null)))
 		}
 
 		if(count === 0) this.Log("No content found in timeline")
@@ -379,7 +388,7 @@ export default class Downloader {
 		/** @type {Map<string, Date>} */
 		const urls = new Map
 
-		let shouldLimit = data && typeof data.limit === "number"
+		const shouldLimit = data && typeof data.limit === "number"
 		let limited = false
 
 		if(shouldLimit && !data.limit) return {
@@ -425,9 +434,14 @@ export default class Downloader {
 			data.count++
 		}
 
-		await Promise.all(Array.from(urls.entries()).map(([url, date]) =>
-			this.Download(url, folder, date)
-		))
+		await Promise.all(Array.from(urls.entries()).map(async ([url, date]) => {
+			try{
+				await this.Download(url, folder, date)
+			}catch(error){
+				this.Log(error)
+				urls.delete(url)
+			}
+		}))
 
 		return {
 			urls: new Set(urls.keys()),
@@ -488,7 +502,7 @@ export default class Downloader {
 		let response
 
 		const handleCookies = async () => {
-			const setCookies = response.headers["set-cookie"]
+			const setCookies = response?.headers["set-cookie"]
 
 			if(!setCookies) return
 
@@ -517,6 +531,7 @@ export default class Downloader {
 			// TODO: Handle axios errors in test mode to prevent token's leakage
 			if(error instanceof AxiosError){
 				if(error.response){
+					response = error.response
 					await handleCookies()
 					return error.response
 				}
@@ -531,11 +546,14 @@ export default class Downloader {
 		if(config.app_id && config.queryHash) return
 
 		const response = await this.Request(new URL(usernames[0], BASE_URL), "GET", { responseType: "text" })
-		const appId = response.data.match(/"X-IG-App-ID":"(\d+)"/)?.[1]
-		const queryHash = response.data.match(/"query_hash":"([a-z0-9]+)"/)?.[1]
 
-		config.queryHash = queryHash
-		config.app_id = appId
+		if(typeof response?.data === "string"){
+			const appId = response.data.match(/"X-IG-App-ID":"(\d+)"/)?.[1]
+			const queryHash = response.data.match(/"query_hash":"([a-z0-9]+)"/)?.[1]
+
+			config.queryHash = queryHash
+			config.app_id = appId
+		}
 	}
 	Log(...args){
 		if(isTesting) return
