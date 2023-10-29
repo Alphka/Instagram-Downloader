@@ -1,13 +1,13 @@
 {
 	"author": "Kayo Souza",
 	"name": "insta-downloader",
-	"version": "2.0.4",
+	"version": "2.1.0",
 	"description": "An application to download content from Instagram",
 	"main": "src/index.js",
 	"scripts": {
 		"start": "node --no-warnings .",
-		"test": "node --no-warnings --test tests/",
-		"test:watch": "node --no-warnings --test --watch tests/",
+		"test": "node --no-warnings --test tests/index.test.js",
+		"test:watch": "node --no-warnings --test --watch tests/index.test.js",
 		"lint": "tsc -p jsconfig.json"
 	},
 	"keywords": [
@@ -19,18 +19,18 @@
 		"videos"
 	],
 	"dependencies": {
-		"axios": "^1.5.1",
+		"axios": "^1.6.0",
 		"chalk": "^5.3.0",
-		"commander": "^11.0.0",
-		"dotenv": "^16.3.1",
-		"mime": "^3.0.0",
-		"sharp": "^0.32.6"
+		"commander": "~11.1.0",
+		"dotenv": "~16.3.1",
+		"mime": "~3.0.0",
+		"sharp": "~0.32.6"
 	},
 	"devDependencies": {
-		"@types/mime": "^3.0.1",
-		"@types/node": "^20.4.5",
-		"@types/sharp": "^0.31.1",
-		"typescript": "^5.1.6"
+		"@types/mime": "~3.0.3",
+		"@types/node": "^20.8.9",
+		"@types/sharp": "~0.31.1",
+		"typescript": "^5.2.2"
 	},
 	"repository": {
 		"type": "git",
@@ -45,7 +45,7 @@
 	},
 	"engines": {
 		"npm": "^8.19.4 || >=9.8.1",
-		"node": "^16.19 || ^18.13 || ^19.2 || >=20"
+		"node": "^16.19 || ^18.13 || ^19.2 || 20 || 21"
 	},
 	"license": "ISC",
 	"type": "module"
