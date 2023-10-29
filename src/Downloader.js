@@ -7,6 +7,7 @@ import GetCorrectContent from "./helpers/GetCorrectContent.js"
 import GetURLFilename from "./helpers/GetURLFilename.js"
 import Question from "./helpers/Question.js"
 import axios, { AxiosError } from "axios"
+import dotenv from "dotenv"
 import chalk from "chalk"
 import sharp from "sharp"
 import mime from "mime"
@@ -17,7 +18,7 @@ const __dirname = dirname(__filename)
 const root = join(__dirname, "..")
 const configPath = join(root, "config.json")
 
-const isTesting = process.env.npm_command === "test"
+const isTesting = process.env.npm_command === "test" || process.env.npm_lifecycle_event === "test"
 
 export default class Downloader {
 	/** @type {import("./typings/api.js").APIHeaders} */ headers
@@ -58,7 +59,36 @@ export default class Downloader {
 	}
 	SetConfig(sync = false){
 		const data = JSON.stringify(this.config, null, "\t") + "\n"
-		return (sync ? writeFileSync : writeFile)(configPath, data, "utf8")
+
+		if(sync){
+			writeFileSync(configPath, data, "utf8")
+			this.SetEnv(true)
+			return
+		}
+
+		return writeFile(configPath, data, "utf8")
+			.then(() => this.SetEnv())
+	}
+	SetEnv(sync = false){
+		const { config } = this
+		const envPath = join(root, ".env")
+		const data = existsSync(envPath) ? dotenv.parse(envPath) : {}
+
+		/** @type {Record<string, string>} */
+		let newData = {
+			TOKEN: config.csrftoken,
+			USER_ID: config.cookie.ds_user_id,
+			SESSION_ID: config.cookie.sessionid
+		}
+
+		newData = Object.fromEntries(Object.entries(newData).filter(([key, value]) => value))
+
+		Object.assign(data, newData)
+
+		const envString = Object.entries(data).map(([key, value]) => `${key}=${value}`).join("\n") + "\n"
+
+		if(sync) writeFileSync(envPath, envString, "utf8")
+		else return writeFile(envPath, envString, "utf8")
 	}
 	UpdateHeaders(){
 		const { headers, config: { csrftoken, app_id, cookie } } = this
@@ -101,7 +131,7 @@ export default class Downloader {
 				this.config.cookie.sessionid = session
 
 				this.UpdateHeaders()
-				await this.SetConfig()
+				this.SetConfig(true)
 			}
 		}while(true)
 
@@ -120,6 +150,7 @@ export default class Downloader {
 			}catch(error){
 				if(error instanceof Error) error.message = `User not found: ${username}`
 				this.Log(error)
+				continue
 			}
 
 			this.Log(`Downloading from user: ${username}, id: ${user_id}`)
@@ -287,7 +318,12 @@ export default class Downloader {
 
 					if(!filenames.includes(coverFilename)){
 						count++
-						await this.Download(coverUrl, folder, new Date)
+
+						try{
+							await this.Download(coverUrl, folder, new Date)
+						}catch(error){
+							this.Log(error)
+						}
 					}
 				}
 
@@ -466,7 +502,10 @@ export default class Downloader {
 			Object.assign(config, { responseType: "arraybuffer" })
 
 			/** @type {import("axios").AxiosResponse<Buffer>} */
-			const { data } = await this.Request(url, "GET", config)
+			const { data, status } = await this.Request(url, "GET", config)
+
+			if(status < 200 || status >= 300) throw new Error(`Request to media ${filename} failed with status ${status}`)
+
 			const { format } = await sharp(data).metadata()
 			const path = join(folder, `${name}.${format === "jpeg" ? "jpg" : format}`)
 
