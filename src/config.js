@@ -31,6 +31,12 @@ const config = {
 			syntax: "<number>"
 		},
 		{
+			option: "limit",
+			alternative: "l",
+			description: "Set how many items to download in total",
+			syntax: "<number>"
+		},
+		{
 			option: "no-stories",
 			alternative: "ns",
 			description: "Disable stories download"

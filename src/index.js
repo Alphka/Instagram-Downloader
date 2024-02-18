@@ -13,7 +13,6 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 const cwd = process.cwd()
-const args = process.argv.slice(2)
 const root = join(__dirname, "..")
 
 /**
@@ -21,7 +20,7 @@ const root = join(__dirname, "..")
  * @param {boolean} force
  */
 function GetOutputDirectory(directory, force){
-	if(!directory) return GetOutputDirectory(process.cwd(), force)
+	if(!directory) return GetOutputDirectory(cwd, force)
 
 	const path = resolve(cwd, directory)
 	const relativePath = relative(root, path)
@@ -61,7 +60,7 @@ const command = program
 
 		const output = GetOutputDirectory(options.output, options.force)
 
-		new Downloader(command.args, isNumber(options.queue) ? Number(options.queue) : 12).Init({
+		new Downloader(command.args, isNumber(options.queue) ? Number(options.queue) : 12, isNumber(options.limit) ? Number(options.limit) : undefined).Init({
 			output,
 			...options
 		})
@@ -84,4 +83,4 @@ config.options.forEach(({ option, alternative, description, defaultValue, syntax
 	command.option(flags, description, defaultValue)
 })
 
-command.parse(process.argv)
+command.parse()

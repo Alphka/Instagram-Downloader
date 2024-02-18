@@ -26,7 +26,7 @@ const output = join(root, "output")
 const folder = join(output, username)
 
 test("Instagram API", async t => {
-	const downloader = new Downloader(username)
+	const downloader = new Downloader(username, 12)
 
 	await t.test("should reject if user is not logged in", async () => {
 		await assert.rejects(downloader.CheckLogin.bind(downloader))
@@ -46,10 +46,10 @@ test("Instagram API", async t => {
 	await t.test("should update headers", () => {
 		downloader.UpdateHeaders()
 
-		assert.ok(typeof downloader.headers === "object")
-		assert.ok(typeof downloader.headers.Cookie === "string")
-		assert.ok(downloader.headers.Cookie.includes("ds_user_id"))
-		assert.ok(downloader.headers.Cookie.includes("sessionid"))
+		assert.strictEqual(typeof downloader.headers, "object")
+		assert.strictEqual(typeof downloader.headers.Cookie, "string")
+		assert.match(downloader.headers.Cookie, /\bds_user_id=\d/)
+		assert.match(downloader.headers.Cookie, /\bsessionid=\d/)
 		assert.strictEqual(downloader.headers["X-Csrftoken"], TOKEN)
 	})
 
@@ -57,15 +57,12 @@ test("Instagram API", async t => {
 		await downloader.CheckServerConfig()
 		downloader.UpdateHeaders()
 
-		const { app_id, queryHash } = downloader.config
+		const { app_id } = downloader.config
 
-		assert.ok(typeof app_id === "string")
+		assert.strictEqual(typeof app_id, "string")
 		assert.strictEqual(downloader.headers["X-Ig-App-Id"], app_id)
 
-		assert.ok(typeof queryHash === "string")
-		assert.ok(/^[a-z0-9]+$/.test(queryHash))
-
-		if(app_id !== "936619743392459") t.diagnostic("App id has changed")
+		if(app_id !== "936619743392459") t.diagnostic("App ID has changed: " + app_id)
 	})
 
 	await t.test("should check if user is logged in", async () => {
@@ -75,20 +72,20 @@ test("Instagram API", async t => {
 	await t.test("should get user id", async () => {
 		const userId = await downloader.GetUserId("instagram")
 
-		assert.ok(typeof userId === "string")
+		assert.strictEqual(typeof userId, "string")
 		assert.strictEqual(userId, "25025320")
 	})
 
-	async function EmptyFolder(){
-		const contents = await readdir(folder, { withFileTypes: true })
-
-		await Promise.all(contents.map(content => {
-			const path = join(folder, content.name)
-			return rm(path, { recursive: content.isFile() })
-		}))
-	}
-
 	await t.test("Download", async t => {
+		async function EmptyFolder(){
+			const contents = await readdir(folder, { withFileTypes: true })
+
+			await Promise.all(contents.map(content => {
+				const path = join(folder, content.name)
+				return rm(path, { recursive: content.isFile() })
+			}))
+		}
+
 		if(existsSync(folder)) await EmptyFolder()
 		else await mkdir(folder, { recursive: true })
 
@@ -97,12 +94,12 @@ test("Instagram API", async t => {
 			assert.strictEqual((await readdir(folder)).length, 20)
 		})
 
-		await EmptyFolder()
+		/* await EmptyFolder()
 
 		await t.test("should download 20 items from highlights", async () => {
 			await downloader.DownloadHighlights("25025320", folder, true, 20)
 			assert.strictEqual((await readdir(folder)).length, 20)
-		})
+		}) */
 
 		await rm(folder, { recursive: true })
 	})

@@ -6,6 +6,7 @@ import { fileURLToPath } from "url"
 import GetCorrectContent from "./helpers/GetCorrectContent.js"
 import GetURLFilename from "./helpers/GetURLFilename.js"
 import Question from "./helpers/Question.js"
+import Queue from "./Queue.js"
 import axios, { AxiosError } from "axios"
 import dotenv from "dotenv"
 import chalk from "chalk"
@@ -20,33 +21,46 @@ const configPath = join(root, "config.json")
 
 const isTesting = process.env.npm_command === "test" || process.env.npm_lifecycle_event === "test"
 
+Object.assign(axios.defaults.headers.common, {
+	"Sec-Ch-Prefers-Color-Scheme": "dark",
+	"Sec-Ch-Ua": '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
+	"Sec-Ch-Ua-Full-version-list": '"Not A(Brand";v="99.0.0.0", "Google Chrome";v="121.0.6167.185", "Chromium";v="121.0.6167.185"',
+	"Sec-Ch-Ua-Mobile": "?0",
+	"Sec-Ch-Ua-Model": '""',
+	"Sec-Ch-Ua-Platform": '"Windows"',
+	"Sec-Ch-Ua-Platform-version": '"15.0.0"',
+	"Sec-Fetch-Site": "same-origin",
+	"Sec-Fetch-Dest": "empty",
+	"Sec-Fetch-Mode": "cors",
+	"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+})
+
 export default class Downloader {
-	/** @type {import("./typings/api.js").APIHeaders} */ headers
+	/** @type {import("./typings/api.js").APIHeaders} */ headers = {
+		Accept: "*/*",
+		Origin: BASE_URL
+	}
 	/** @type {import("./typings/index.js").Config} */ config
 	/** @type {string[]} */ usernames
-	/** @type {number} */ limit
+	/** @type {number | undefined} */ limit
 	/** @type {string} */ output
+	/** @type {Queue<ReturnType<typeof this.Download>>} */ queue
 
 	/**
 	 * @param {string | string[]} usernames
+	 * @param {number} queue
 	 * @param {number} [limit]
 	 */
-	constructor(usernames, limit = 15){
+	constructor(usernames, queue, limit){
 		this.usernames = Array.isArray(usernames) ? usernames : [usernames]
 		this.limit = limit
-
-		// TODO: Add an array with the downloads queue
-
-		this.headers = {
-			Accept: "*/*",
-			Origin: BASE_URL
-		}
+		this.queue = new Queue(queue)
 	}
 	GetConfig(){
 		if(!existsSync(configPath)){
 			/** @type {import("./typings/index.js").Config} */
 			const config = this.config = { cookie: {} }
-			if(!isTesting) this.SetConfig(true)
+			this.SetConfig(true)
 			return config
 		}
 
@@ -57,7 +71,9 @@ export default class Downloader {
 
 		return this.config = /** @type {import("./typings/index.js").Config} */ (config)
 	}
-	SetConfig(sync = false){
+	async SetConfig(sync = false){
+		if(isTesting) return
+
 		const data = JSON.stringify(this.config, null, "\t") + "\n"
 
 		if(sync){
@@ -66,10 +82,12 @@ export default class Downloader {
 			return
 		}
 
-		return writeFile(configPath, data, "utf8")
-			.then(() => this.SetEnv())
+		await writeFile(configPath, data, "utf8")
+		await this.SetEnv(sync)
 	}
 	SetEnv(sync = false){
+		if(isTesting) return
+
 		const { config } = this
 		const envPath = join(root, ".env")
 		const data = existsSync(envPath) ? dotenv.parse(envPath) : {}
@@ -96,7 +114,7 @@ export default class Downloader {
 		if(csrftoken) headers["X-Csrftoken"] = csrftoken
 		if(app_id) headers["X-Ig-App-Id"] = app_id
 
-		headers.Cookie = Object.entries(cookie).map(([key, value]) => `${key}=${value ?? ""}`).join("; ")
+		headers.Cookie = Object.entries(cookie).map(([key, value]) => `${key}=${value || ""}`).join("; ")
 	}
 	/** @param {{
 	 * 	output: string
@@ -157,10 +175,12 @@ export default class Downloader {
 
 			const folder = join(output, username)
 
+			if(highlights) this.Log(new Error("Highlights download disabled temporarily"))
+
 			const results = await Promise.allSettled([
 				timeline && this.DownloadTimeline(username, folder),
-				highlights && this.DownloadHighlights(user_id, folder, hcover),
-				stories && this.DownloadStories(user_id, folder)
+				// highlights && this.DownloadHighlights(user_id, folder, hcover, this.limit, username),
+				stories && this.DownloadStories(user_id, folder, this.limit, username)
 			])
 
 			for(const result of results){
@@ -206,11 +226,13 @@ export default class Downloader {
 		const { id } = await this.GetUser(username)
 		return id
 	}
-	/** @param {string} user_id */
-	async GetHighlights(user_id){
+	/**
+	 * @param {string} user_id
+	 * @param {string} username
+	 */
+	async GetHighlights(user_id, username){
 		const url = new URL(API_QUERY, BASE_URL)
 
-		url.searchParams.set("query_hash", this.config.queryHash)
 		url.searchParams.set("user_id", user_id)
 		url.searchParams.set("include_chaining", "false")
 		url.searchParams.set("include_reel", "false")
@@ -221,33 +243,50 @@ export default class Downloader {
 
 		/** @type {import("axios").AxiosResponse<import("./typings/api.js").QueryHighlightsResponse>} */
 		const response = await this.Request(url, "GET", {
-			headers: { "X-Requested-With": "XMLHttpRequest" },
+			headers: {
+				Referer: username ? `${BASE_URL}/${username}/` : BASE_URL + "/",
+				"X-Requested-With": "XMLHttpRequest"
+			},
 			responseType: "json"
 		})
 
-		return response.data.data.user.edge_highlight_reels.edges.map(({ node }) => node)
+		try{
+			return response.data.data.user.edge_highlight_reels.edges.map(({ node }) => node)
+		}catch(error){
+			throw new Error(`Failed to get user (${username || user_id}) highlights`, {
+				cause: /** @type {Error} */ (error).message.replace(/\[?Error\]?:? ?/, "")
+			})
+		}
 	}
-	/** @param {`${number}`[]} reelsIds */
-	async GetHighlightsContents(reelsIds){
+	/**
+	 * @param {`${number}`[]} reelsIds
+	 * @param {string} [username]
+	 */
+	async GetHighlightsContents(reelsIds, username){
 		const url = new URL(API_REELS, BASE_URL)
 
 		for(const id of reelsIds) url.searchParams.append("reel_ids", "highlight:" + id)
 
 		/** @type {import("axios").AxiosResponse<import("./typings/api.js").HighlightsAPIResponse>} */
 		const response = await this.Request(url, "GET", {
+			headers: { Referer: username ? `${BASE_URL}/${username}/` : BASE_URL + "/" },
 			responseType: "json"
 		})
 
 		return response.data.reels_media
 	}
-	/** @param {`${number}`} userId */
-	async GetStories(userId){
+	/**
+	 * @param {`${number}`} userId
+	 * @param {string} [username]
+	 */
+	async GetStories(userId, username){
 		const url = new URL(API_REELS, BASE_URL)
 
 		url.searchParams.set("reel_ids", userId)
 
 		/** @type {import("axios").AxiosResponse<import("./typings/api.js").StoriesAPIResponse>} */
 		const response = await this.Request(url, "GET", {
+			headers: { Referer: username ? `${BASE_URL}/${username}/` : BASE_URL + "/" },
 			responseType: "json"
 		})
 
@@ -263,9 +302,10 @@ export default class Downloader {
 	 * @param {string} folder
 	 * @param {boolean} [hcover]
 	 * @param {number} [limit]
+	 * @param {string} [username]
 	 */
-	async DownloadHighlights(user_id, folder, hcover, limit = Infinity){
-		const highlights = await this.GetHighlights(user_id)
+	async DownloadHighlights(user_id, folder, hcover, limit = Infinity, username){
+		const highlights = await this.GetHighlights(user_id, username)
 
 		const highlightsMap = new Map(highlights.map(reel => [reel.id, reel]))
 
@@ -277,7 +317,7 @@ export default class Downloader {
 
 		while(highlights.length && limit > count){
 			const ids = highlights.splice(0, 10).map(({ id }) => id)
-			const highlightsContents = await this.GetHighlightsContents(ids)
+			const highlightsContents = await this.GetHighlightsContents(ids, username)
 
 			if(!highlightsContents) throw new Error("No highlights found. The request might have been forbidden")
 
@@ -307,7 +347,7 @@ export default class Downloader {
 				}
 
 				const data = { count, limit }
-				const { urls, limited } = await this.DownloadItems(items, folder, data)
+				const { urls, limited } = await this.DownloadItems(items, folder, data, username)
 
 				count = data.count
 
@@ -339,9 +379,10 @@ export default class Downloader {
 	 * @param {string} user_id
 	 * @param {string} folder
 	 * @param {number} [limit]
+	 * @param {string} [username]
 	 */
-	async DownloadStories(user_id, folder, limit = Infinity){
-		const results = await this.GetStories(/** @type {`${number}`} */ (user_id))
+	async DownloadStories(user_id, folder, limit = Infinity, username){
+		const results = await this.GetStories(/** @type {`${number}`} */ (user_id), username)
 
 		if(!results) return this.Log("No stories found")
 
@@ -357,7 +398,7 @@ export default class Downloader {
 		while(stories.length && limit > count){
 			const items = stories.splice(0, 10)
 			const data = { count, limit }
-			const { limited } = await this.DownloadItems(items, folder, data)
+			const { limited } = await this.DownloadItems(items, folder, data, username)
 
 			count = data.count
 
@@ -396,12 +437,10 @@ export default class Downloader {
 					first = false
 				}
 
-				if(!existsSync(folder)){
-					await mkdir(folder, { recursive: true })
-				}
+				await mkdir(folder, { recursive: true })
 
 				const data = { count, limit }
-				const { limited } = await this.DownloadItems(items, folder, data)
+				const { limited } = await this.DownloadItems(items, folder, data, username)
 
 				if(limited) break
 
@@ -416,11 +455,10 @@ export default class Downloader {
 	/**
 	 * @param {import("./typings/api.js").FeedItem[]} items
 	 * @param {string} folder
-	 * @param {object} [data]
-	 * @param {number} data.count
-	 * @param {number} data.limit
+	 * @param {{ count: number, limit: number }} [data]
+	 * @param {string} [username]
 	 */
-	async DownloadItems(items, folder, data){
+	async DownloadItems(items, folder, data, username){
 		/** @type {Map<string, Date>} */
 		const urls = new Map
 
@@ -472,9 +510,11 @@ export default class Downloader {
 
 		await Promise.all(Array.from(urls.entries()).map(async ([url, date]) => {
 			try{
-				await this.Download(url, folder, date)
+				await this.Download(url, folder, date, undefined, {
+					headers: { Referer: username ? `${BASE_URL}/${username}/` : BASE_URL + "/" }
+				})
 			}catch(error){
-				this.Log(error)
+				this.Log(error instanceof Error ? error : new Error(String(error)))
 				urls.delete(url)
 			}
 		}))
@@ -487,45 +527,48 @@ export default class Downloader {
 	/**
 	 * @param {string} url
 	 * @param {string} folder
-	 * @param {Date} [date]
+	 * @param {Date | number} [date]
 	 * @param {string} [filename]
 	 * @param {import("axios").AxiosRequestConfig} [config]
 	 * @returns {Promise<string>}
 	 */
-	async Download(url, folder, date = new Date, filename, config){
-		if(!config) config = {}
+	async Download(url, folder, date = new Date, filename = "", config = {}){
 		if(!filename) filename = GetURLFilename(url)
 
 		const { name, ext } = parse(filename)
 
 		if(/^image\/.+$/.test(mime.getType(ext))){
-			Object.assign(config, { responseType: "arraybuffer" })
+			return this.queue.add(async () => {
+				Object.assign(config, { responseType: "arraybuffer" })
 
-			/** @type {import("axios").AxiosResponse<Buffer>} */
-			const { data, status } = await this.Request(url, "GET", config)
+				/** @type {import("axios").AxiosResponse<Buffer>} */
+				const { data, status } = await this.Request(url, "GET", config)
 
-			if(status < 200 || status >= 300) throw new Error(`Request to media ${filename} failed with status ${status}`)
+				if(status < 200 || status >= 300) throw new Error(`Request to media ${filename} failed with status ${status}`)
 
-			const { format } = await sharp(data).metadata()
-			const path = join(folder, `${name}.${format === "jpeg" ? "jpg" : format}`)
+				const { format } = await sharp(data).metadata()
+				const path = join(folder, `${name}.${format === "jpeg" ? "jpg" : format}`)
 
-			await writeFile(path, data)
-			await utimes(path, date, date)
+				await writeFile(path, data)
+				await utimes(path, new Date, date)
 
-			return path
+				return path
+			})
 		}
 
-		Object.assign(config, { responseType: "stream" })
+		return this.queue.add(async () => {
+			Object.assign(config, { responseType: "stream" })
 
-		/** @type {import("axios").AxiosResponse<import("stream").PassThrough>} */
-		const { data } = await this.Request(url, "GET", config)
-		const path = join(folder, filename)
-		const file = createWriteStream(path)
+			/** @type {import("axios").AxiosResponse<import("stream").PassThrough>} */
+			const { data } = await this.Request(url, "GET", config)
+			const path = join(folder, filename)
+			const file = createWriteStream(path)
 
-		return new Promise((resolve, reject) => {
-			file.on("close", () => utimes(path, date, date).then(() => resolve(path)).catch(reject))
-			file.on("error", reject)
-			data.pipe(file)
+			return new Promise((resolve, reject) => {
+				file.on("close", () => utimes(path, date, date).then(() => resolve(path)).catch(reject))
+				file.on("error", reject)
+				data.pipe(file)
+			})
 		})
 	}
 	/**
@@ -535,7 +578,7 @@ export default class Downloader {
 	 * @param {Omit<import("axios").AxiosRequestConfig, "url" | "method">} [config]
 	 */
 	async Request(url, method = "GET", config = {}){
-		config.headers = Object.assign({}, this.headers, config.headers ?? {})
+		config.headers = Object.assign({}, this.headers, config.headers || {})
 
 		/** @type {import("axios").AxiosResponse<T>} */
 		let response
@@ -553,12 +596,25 @@ export default class Downloader {
 			})
 
 			this.UpdateHeaders()
-			if(!isTesting) await this.SetConfig()
+			await this.SetConfig()
 		}
+
+		let _url
+
+		if(url instanceof URL){
+			_url = url
+			url = url.href
+		}else{
+			_url = new URL(url)
+		}
+
+		Object.assign(config.headers, {
+			"Sec-Fetch-Site": BASE_URL === _url.origin ? "same-origin" : "cross-site"
+		})
 
 		try{
 			response = await axios({
-				url: url instanceof URL ? url.href : url,
+				url,
 				method,
 				...config
 			})
@@ -567,7 +623,6 @@ export default class Downloader {
 
 			return response
 		}catch(error){
-			// TODO: Handle axios errors in test mode to prevent token's leakage
 			if(error instanceof AxiosError){
 				if(error.response){
 					response = error.response
@@ -576,22 +631,18 @@ export default class Downloader {
 				}
 			}
 
-			throw error
+			throw error instanceof Error ? new Error(error.name, { cause: error.message }) : error
 		}
 	}
 	async CheckServerConfig(){
 		const { config, usernames } = this
 
-		if(config.app_id && config.queryHash) return
+		if(config.app_id) return
 
 		const response = await this.Request(new URL(usernames[0], BASE_URL), "GET", { responseType: "text" })
 
 		if(typeof response?.data === "string"){
-			const appId = response.data.match(/"X-IG-App-ID":"(\d+)"/)?.[1]
-			const queryHash = response.data.match(/"query_hash":"([a-z0-9]+)"/)?.[1]
-
-			config.queryHash = queryHash
-			config.app_id = appId
+			config.app_id = response.data.match(/"X-IG-App-ID":"(\d+)"/)?.[1]
 		}
 	}
 	Log(...args){
@@ -601,10 +652,15 @@ export default class Downloader {
 
 		if(args.length === 1){
 			const arg = args[0]
-			if(arg instanceof Error) return console.error(chalk.redBright(`[${date}] ${args[0].message}`))
+
+			if(arg instanceof Error){
+				const message = arg.cause ? `${arg.message} (${arg.cause})` : arg.message
+				return console.error(chalk.redBright(`[${date}] ${message}`))
+			}
+
 			if(typeof arg === "string") return console.log(`${chalk.blackBright(`[${date}]`)} ${arg}`)
 		}
 
-		console.log(chalk.blackBright(`[${date}] `), ...args)
+		console.log(chalk.blackBright(`[${date}]`), ...args)
 	}
 }

@@ -27,6 +27,7 @@ Options:
   -o, --output [path]   Output directory
   -f, --force           Force creation of output directory
   -q, --queue <number>  Set how many items to get from Instagram API (default: 12)
+  -l, --limit <number>  Set how many items to download in total
   -ns, --no-stories     Disable stories download
   -nt, --no-timeline    Disable timeline download
   -nh, --no-highlights  Disable highlights download
