@@ -94,12 +94,12 @@ test("Instagram API", async t => {
 			assert.strictEqual((await readdir(folder)).length, 20)
 		})
 
-		/* await EmptyFolder()
+		await EmptyFolder()
 
 		await t.test("should download 20 items from highlights", async () => {
 			await downloader.DownloadHighlights("25025320", folder, true, 20)
 			assert.strictEqual((await readdir(folder)).length, 20)
-		}) */
+		})
 
 		await rm(folder, { recursive: true })
 	})

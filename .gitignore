@@ -1,7 +1,8 @@
-.vscode
-node_modules
-output
+.vscode/
+node_modules/
+output/
 tests/*
 !tests/index.test.js
 .env
 config.json
+test*.*

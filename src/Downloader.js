@@ -175,11 +175,9 @@ export default class Downloader {
 
 			const folder = join(output, username)
 
-			if(highlights) this.Log(new Error("Highlights download disabled temporarily"))
-
 			const results = await Promise.allSettled([
 				timeline && this.DownloadTimeline(username, folder),
-				// highlights && this.DownloadHighlights(user_id, folder, hcover, this.limit, username),
+				highlights && this.DownloadHighlights(user_id, folder, hcover, this.limit, username),
 				stories && this.DownloadStories(user_id, folder, this.limit, username)
 			])
 
@@ -233,25 +231,20 @@ export default class Downloader {
 	async GetHighlights(user_id, username){
 		const url = new URL(API_QUERY, BASE_URL)
 
-		url.searchParams.set("user_id", user_id)
-		url.searchParams.set("include_chaining", "false")
-		url.searchParams.set("include_reel", "false")
-		url.searchParams.set("include_suggested_users", "false")
-		url.searchParams.set("include_logged_out_extras", "false")
-		url.searchParams.set("include_live_status", "false")
-		url.searchParams.set("include_highlight_reels", "true")
-
-		/** @type {import("axios").AxiosResponse<import("./typings/api.js").QueryHighlightsResponse>} */
-		const response = await this.Request(url, "GET", {
+		/** @type {import("axios").AxiosResponse<import("./typings/api.js").QueryHighlightsAPIResponse>} */
+		const response = await this.Request(url, "POST", {
+			data: new URLSearchParams({
+				variables: JSON.stringify({ user_id }),
+				doc_id: "8298007123561120"
+			}),
 			headers: {
-				Referer: username ? `${BASE_URL}/${username}/` : BASE_URL + "/",
-				"X-Requested-With": "XMLHttpRequest"
+				Referer: username ? `${BASE_URL}/${username}/` : BASE_URL + "/"
 			},
 			responseType: "json"
 		})
 
 		try{
-			return response.data.data.user.edge_highlight_reels.edges.map(({ node }) => node)
+			return response.data.data.highlights.edges.map(({ node }) => node)
 		}catch(error){
 			throw new Error(`Failed to get user (${username || user_id}) highlights`, {
 				cause: /** @type {Error} */ (error).message.replace(/\[?Error\]?:? ?/, "")
@@ -259,21 +252,35 @@ export default class Downloader {
 		}
 	}
 	/**
-	 * @param {`${number}`[]} reelsIds
+	 * @param {import("./typings/api.js").HighlightId[]} reelsIds
 	 * @param {string} [username]
+	 * @param {number} [first]
 	 */
-	async GetHighlightsContents(reelsIds, username){
-		const url = new URL(API_REELS, BASE_URL)
+	async GetHighlightsContents(reelsIds, username, first){
+		const url = new URL(API_QUERY, BASE_URL)
 
-		for(const id of reelsIds) url.searchParams.append("reel_ids", "highlight:" + id)
+		first ??= this.queue?.limit ?? 10
 
 		/** @type {import("axios").AxiosResponse<import("./typings/api.js").HighlightsAPIResponse>} */
-		const response = await this.Request(url, "GET", {
-			headers: { Referer: username ? `${BASE_URL}/${username}/` : BASE_URL + "/" },
+		const response = await this.Request(url, "POST", {
+			data: new URLSearchParams({
+				variables: JSON.stringify({
+					after: null,
+					before: null,
+					first: reelsIds.length,
+					initial_reel_id: reelsIds[0],
+					reel_ids: reelsIds,
+					last: null
+				}),
+				doc_id: "25536143079310158"
+			}),
+			headers: {
+				Referer: username ? `${BASE_URL}/${username}/` : BASE_URL + "/"
+			},
 			responseType: "json"
 		})
 
-		return response.data.reels_media
+		return response.data.data.xdt_api__v1__feed__reels_media__connection.edges.map(({ node }) => node)
 	}
 	/**
 	 * @param {`${number}`} userId
@@ -329,20 +336,18 @@ export default class Downloader {
 			for(const { id, items } of highlightsContents){
 				if(count > limit) throw new Error("Unexpected error")
 
-				const highlightId = /** @type {`${number}`} */ (id.substring(id.indexOf(":") + 1))
-
-				this.Log(`Downloading highlight: ${highlightId}`)
+				this.Log(`Downloading highlight: ${id.substring(id.indexOf(":") + 1)}`)
 
 				for(const item of items){
 					const { url } = GetCorrectContent(item)[0]
 					filesSet.add(GetURLFilename(url))
 				}
 
-				const shouldDownloadCover = hcover && highlightsMap.has(highlightId)
+				const shouldDownloadCover = hcover && highlightsMap.has(id)
 				let coverUrl
 
 				if(shouldDownloadCover){
-					const { thumbnail_src: url } = highlightsMap.get(highlightId).cover_media
+					const { cropped_image_version: { url } } = highlightsMap.get(id).cover_media
 					coverUrl = url
 				}
 
@@ -453,7 +458,7 @@ export default class Downloader {
 		if(count === 0) this.Log("No content found in timeline")
 	}
 	/**
-	 * @param {import("./typings/api.js").FeedItem[]} items
+	 * @param {(import("./typings/api.js").FeedItem | import("./typings/api.js").GraphHighlightsMedia | import("./typings/api.js").GraphReelsMedia)[]} items
 	 * @param {string} folder
 	 * @param {{ count: number, limit: number }} [data]
 	 * @param {string} [username]
@@ -590,7 +595,11 @@ export default class Downloader {
 
 			setCookies.forEach(cookieConfig => {
 				const [key, ...values] = cookieConfig.split(";")[0].split("=")
+
+				if(key === "th_eu_pref") return
+
 				const value = encodeURIComponent(values.join("="))
+
 				if(key === "csrftoken") this.config.csrftoken = value
 				this.config.cookie[key] = value
 			})

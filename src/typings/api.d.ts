@@ -42,14 +42,15 @@ export interface VideoVersion extends MediaVersion {
 }
 
 export interface GenericUser {
+	id: `${number}` | null
 	pk: string
 	pk_id: string
-	username: string
+	username: string | null
 	full_name: string
 	is_private: boolean
 	is_verified: boolean
 	profile_pic_id: string
-	profile_pic_url: string
+	profile_pic_url: string | null
 	profile_grid_display_type: "default"
 }
 
@@ -226,7 +227,7 @@ export interface FeedItem {
 			height: number
 			url: string
 			id: string
-		}[]
+		}[] | null
 		video_duration?: number
 		is_dash_eligible?: number
 		video_dash_manifest?: string
@@ -418,7 +419,7 @@ export interface Caption {
 }
 
 export interface Reel {
-	id: string
+	id: `${number}`
 	expiring_at: number
 	has_pride_media: boolean
 	latest_reel_media: number
@@ -444,10 +445,10 @@ export interface ReelChainNode {
 	username: string
 }
 
-export interface ReelUser {
-	id: string
-	profile_pic_url: string
-	username: string
+export interface ReelUser extends Pick<Partial<HighlightUser>, "pk" | "is_private" | "interop_messaging_user_fbid"> {
+	id: string | null
+	profile_pic_url: string | null
+	username: string | null
 }
 
 export interface ReelOwner extends ReelUser {
@@ -464,53 +465,34 @@ export interface FeedAPIResponse {
 	status: APIStatus
 }
 
-export interface QueryHighlightsResponse {
+export interface QueryHighlightsAPIResponse {
 	data: {
-		viewer: {
-			edge_suggested_users?: {
-				count: number
-			}
-		}
-		user: {
-			is_live: boolean
-			reel: Reel
-			/** Suggested users */
-			edge_chaining: {
-				edges: {
-					node: ReelChainNode
-				}[]
-			}
-			edge_highlight_reels: {
-				edges: {
-					node: {
-						__typename: "GraphHighlightReel"
-						id: `${number}`
-						cover_media: {
-							thumbnail_src: string
-						}
-						cover_media_cropped_thumbnail: {
+		highlights: {
+			edges: {
+				node: {
+					id: HighlightId
+					title: "pictures"
+					cover_media: {
+						cropped_image_version: {
 							url: string
 						}
-						owner: ReelOwner
-						title: string
 					}
-				}[]
-			}
-			has_public_story?: boolean
-			is_live?: boolean
-			reel?: {
-				expiring_at: number
-				has_pride_media: boolean
-				id: `${number}`
-				latest_reel_media: number
-				owner: ReelOwner
-				seen: boolean | null
-				user: ReelUser
-				__typename: "GraphReel"
+					user: {
+						username: string
+						id: string | null
+					}
+					__typename: "XDTReelDict"
+				}
+				cursor: string
+			}[]
+			page_info: {
+				end_cursor: string
+				has_previous_page: boolean
+				has_next_page: boolean
 			}
 		}
 	}
-	extensions?: {
+	extensions: {
 		is_final: boolean
 	}
 	status: APIStatus
@@ -1103,7 +1085,7 @@ export interface FacebookAccountAPIResponse {
 		display_name: string
 		sso_login_available: boolean
 		is_sso_enabled: boolean
-	},
+	}
 	status: APIStatus
 }
 
@@ -1122,8 +1104,9 @@ export interface HighlightCoverMedia {
 	upload_id: any
 }
 
-export interface HighlightUser extends Omit<GenericUser, "profile_grid_display_type"> {
-	interop_messaging_user_fbid: number
+export interface HighlightUser extends Omit<GenericUser, "profile_grid_display_type" | "profile_pic_id" | "full_name" | "pk_id"> {
+	interop_messaging_user_fbid: number | null
+	friendship_status?: null
 }
 
 interface ReelMedia<T extends string = HighlightId> {
@@ -1155,11 +1138,111 @@ interface ReelMedia<T extends string = HighlightId> {
 	highlight_reel_type: string
 }
 
-export interface HighlightsAPIResponse {
-	reels: {
-		[highlightId: HighlightId]: ReelMedia<HighlightId>
+interface GraphReelsMedia {
+	preview: null
+	product_type: "story"
+	reshared_story_media_author: null
+	sharing_friction_info: {
+		bloks_app_url: null
+		should_have_sharing_friction: boolean
 	}
-	reels_media: ReelMedia<HighlightId>[]
+	sponsor_tags: null
+	story_app_attribution: null
+	story_bloks_stickers: null
+	story_countdowns: null
+	story_cta: null
+	story_feed_media: null
+	story_hashtags: null
+	story_link_stickers: null
+	story_locations: null
+	story_music_stickers: null
+	story_questions: null
+	story_sliders: null
+	taken_at: number
+	text_post_share_to_ig_story_stickers: null
+	video_dash_manifest: null
+	video_duration: null
+	video_versions: null
+	viewer_count: null
+	viewers: null
+	visual_comment_reply_sticker_info: null
+	accessibility_caption: string
+	audience: null | "besties"
+	boost_unavailable_identifier: null
+	boost_unavailable_reason: null
+	boosted_status: null
+	can_see_insights_as_brand: boolean
+	can_viewer_reshare: null
+	carousel_media: null
+	carousel_media_count: null
+	expiring_at: number
+	has_audio: null
+	has_liked: boolean
+	has_translation: boolean
+	ig_media_sharing_disabled: boolean
+	inventory_source: null
+	is_dash_eligible: null
+	is_paid_partnership: boolean
+	media_overlay_info: null
+	media_type: number
+	number_of_qualities: null
+	organic_tracking_token: string
+	original_height: number
+	original_width: number
+	pk: `${number}`
+	user: ReelUser
+	image_versions2: {
+		candidates: ImageVersion[]
+	}
+}
+
+export interface GraphHighlightsMedia extends GraphReelsMedia {
+	id: string
+	can_reply: boolean
+	can_reshare: boolean
+	__typename: "XDTMediaDict"
+}
+
+export interface GraphReelUser {
+	id: null | string
+	pk: `${number}`
+	profile_pic_url: null | string
+	username: null | string
+	is_private: false
+}
+
+export interface HighlightsAPIResponse {
+	data: {
+		xdt_api__v1__feed__reels_media__connection: {
+			edges: [{
+				node: {
+					id: HighlightId
+					items: GraphHighlightsMedia[]
+					user: HighlightUser
+					reel_type: "highlight_reel"
+					cover_media: {
+						cropped_image_version: {
+							url: string
+						}
+						full_image_version: string | null
+					}
+					title: string
+					seen: number | null
+					__typename: "XDTReelDict"
+				}
+				cursor: string
+			}]
+			page_info: {
+				start_cursor: HighlightId
+				end_cursor: HighlightId
+				has_next_page: boolean
+				has_previous_page: boolean
+			}
+		}
+	}
+	extensions: {
+		is_final: boolean
+	}
 	status: APIStatus
 }
 
