@@ -52,7 +52,7 @@ export default class Downloader {
 	 * @param {number} [limit]
 	 */
 	constructor(usernames, queue, limit){
-		this.usernames = Array.isArray(usernames) ? usernames : [usernames]
+		this.usernames = Array.isArray(usernames) ? Array.from(new Set(usernames)) : [usernames]
 		this.limit = limit
 		this.queue = new Queue(queue)
 	}
