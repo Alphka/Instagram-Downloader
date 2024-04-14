@@ -3,6 +3,7 @@ import { fileURLToPath } from "url"
 import { dirname, join } from "path"
 import { existsSync } from "fs"
 import { test } from "node:test"
+import ValidateUsername from "../src/helpers/ValidateUsername.js"
 import Downloader from "../src/Downloader.js"
 import assert from "assert"
 import "dotenv/config"
@@ -24,6 +25,19 @@ const username = "instagram"
 const root = join(__dirname, "..")
 const output = join(root, "output")
 const folder = join(output, username)
+
+test("Username validation", () => {
+	assert.throws(() => ValidateUsername("instagram-"))
+	assert.throws(() => ValidateUsername("instagram/"))
+	assert.throws(() => ValidateUsername("@instagram"))
+	assert.throws(() => ValidateUsername("instagram "))
+	assert.throws(() => ValidateUsername("instagram."))
+	assert.throws(() => ValidateUsername(".instagram"))
+	assert.throws(() => ValidateUsername("instagr..am"))
+	assert.throws(() => ValidateUsername("instagraaaaaaaaaaaaaaaaaaaaaaam"))
+
+	assert.doesNotThrow(() => ValidateUsername("instagram"))
+})
 
 test("Instagram API", async t => {
 	const downloader = new Downloader(username, 12)

@@ -4,6 +4,7 @@ import { mkdir, writeFile, utimes } from "fs/promises"
 import { dirname, join, parse } from "path"
 import { fileURLToPath } from "url"
 import GetCorrectContent from "./helpers/GetCorrectContent.js"
+import ValidateUsername from "./helpers/ValidateUsername.js"
 import GetURLFilename from "./helpers/GetURLFilename.js"
 import Question from "./helpers/Question.js"
 import Queue from "./Queue.js"
@@ -60,25 +61,19 @@ export default class Downloader {
 				const username = this.usernames[index]
 
 				try{
-					this.ValidateUsername(username)
+					ValidateUsername(username)
 				}catch(error){
 					Log(new Error(/** @type {string} */ (error)))
 					this.usernames.splice(index, 1)
 				}
 			}
 		}else{
-			this.ValidateUsername(usernames)
+			ValidateUsername(usernames)
 			this.usernames = [usernames]
 		}
 
 		this.limit = limit
 		this.queue = new Queue(queue)
-	}
-	/** @param {string} username */
-	ValidateUsername(username){
-		if(!/^([A-Za-z0-9_](?:(?:[A-Za-z0-9_]|(?:\.(?!\.))){0,28}(?:[A-Za-z0-9_]))?)$/.test(username)){
-			throw `Invalid username: ${username}`
-		}
 	}
 	GetConfig(){
 		if(!existsSync(configPath)){
