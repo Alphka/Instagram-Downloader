@@ -8,6 +8,7 @@ import packageConfig from "../package.json" assert { type: "json" }
 import Downloader from "./Downloader.js"
 import isNumber from "./helpers/isNumber.js"
 import config from "./config.js"
+import Log from "./helpers/Log.js"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -54,16 +55,26 @@ const command = program
 		 * @param {import("./typings/index.js").Options} options
 		 * @param {import("commander").Command} command
 		 */
-		(_arg, options, command) => {
-		if(!command.args.length) throw "No usernames provided"
-		if(!options.highlights) options.hcover = false
+		async (_arg, options, command) => {
+		try{
+			if(!command.args.length) throw "No usernames provided"
+			if(!options.highlights) options.hcover = false
 
-		const output = GetOutputDirectory(options.output, options.force)
+			const output = GetOutputDirectory(options.output, options.force)
 
-		new Downloader(command.args, isNumber(options.queue) ? Number(options.queue) : 12, isNumber(options.limit) ? Number(options.limit) : undefined).Init({
-			output,
-			...options
-		})
+			const downloader = new Downloader(
+				command.args,
+				isNumber(options.queue) ? Number(options.queue) : 12,
+				isNumber(options.limit) ? Number(options.limit) : undefined
+			)
+
+			await downloader.Init({
+				output,
+				...options
+			})
+		}catch(error){
+			Log(error instanceof Error ? error : new Error(String(error)))
+		}
 	})
 
 config.options.forEach(({ option, alternative, description, defaultValue, syntax }) => {

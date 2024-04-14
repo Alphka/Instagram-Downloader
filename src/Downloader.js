@@ -9,9 +9,9 @@ import Question from "./helpers/Question.js"
 import Queue from "./Queue.js"
 import axios, { AxiosError } from "axios"
 import dotenv from "dotenv"
-import chalk from "chalk"
 import sharp from "sharp"
 import mime from "mime"
+import Log from "./helpers/Log.js"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -40,10 +40,11 @@ export default class Downloader {
 		Accept: "*/*",
 		Origin: BASE_URL
 	}
-	/** @type {import("./typings/index.js").Config} */ config
+
+	/** @type {string} */ output
 	/** @type {string[]} */ usernames
 	/** @type {number | undefined} */ limit
-	/** @type {string} */ output
+	/** @type {import("./typings/index.js").Config} */ config
 	/** @type {Queue<ReturnType<typeof this.Download>>} */ queue
 
 	/**
@@ -52,9 +53,32 @@ export default class Downloader {
 	 * @param {number} [limit]
 	 */
 	constructor(usernames, queue, limit){
-		this.usernames = Array.isArray(usernames) ? Array.from(new Set(usernames)) : [usernames]
+		if(Array.isArray(usernames)){
+			this.usernames = Array.from(new Set(usernames))
+
+			for(let index = this.usernames.length - 1; index >= 0; index--){
+				const username = this.usernames[index]
+
+				try{
+					this.ValidateUsername(username)
+				}catch(error){
+					Log(new Error(/** @type {string} */ (error)))
+					this.usernames.splice(index, 1)
+				}
+			}
+		}else{
+			this.ValidateUsername(usernames)
+			this.usernames = [usernames]
+		}
+
 		this.limit = limit
 		this.queue = new Queue(queue)
+	}
+	/** @param {string} username */
+	ValidateUsername(username){
+		if(!/^([A-Za-z0-9_](?:(?:[A-Za-z0-9_]|(?:\.(?!\.))){0,28}(?:[A-Za-z0-9_]))?)$/.test(username)){
+			throw `Invalid username: ${username}`
+		}
 	}
 	GetConfig(){
 		if(!existsSync(configPath)){
@@ -124,7 +148,10 @@ export default class Downloader {
 	 * 	hcover?: boolean
 	 * }} data */
 	async Init({ output, timeline, highlights, hcover, stories }){
-		this.Log("Initializing")
+		Log("Initializing")
+
+		if(!this.usernames.length) throw "There are no valid usernames"
+
 		this.GetConfig()
 		this.UpdateHeaders()
 
@@ -132,10 +159,10 @@ export default class Downloader {
 			try{
 				await this.CheckServerConfig()
 				await this.CheckLogin()
-				this.Log("Logged in")
+				Log("Logged in")
 				break
 			}catch{
-				this.Log(new Error("You are not logged in. Type your data for authentication."))
+				Log(new Error("You are not logged in. Type your data for authentication."))
 
 				const id = (await Question("User id: ")).trim()
 				const token = (await Question("CSRF Token: ")).trim()
@@ -160,18 +187,18 @@ export default class Downloader {
 				const { id, followed_by_viewer, is_private } = await this.GetUser(username)
 
 				if(is_private && !followed_by_viewer){
-					this.Log(new Error(`You don't have access to a private account: ${username}`))
+					Log(new Error(`You don't have access to a private account: ${username}`))
 					continue
 				}
 
 				user_id = id
 			}catch(error){
 				if(error instanceof Error) error.message = `User not found: ${username}`
-				this.Log(error)
+				Log(error)
 				continue
 			}
 
-			this.Log(`Downloading from user: ${username}, id: ${user_id}`)
+			Log(`Downloading from user: ${username}, id: ${user_id}`)
 
 			const folder = join(output, username)
 
@@ -185,7 +212,7 @@ export default class Downloader {
 				if(result.status === "rejected"){
 					const { reason } = result
 					if(reason instanceof Error) reason.stack = `Failed to download user's content: ${username}`
-					this.Log(reason)
+					Log(reason)
 				}
 			}
 		}
@@ -336,7 +363,7 @@ export default class Downloader {
 			for(const { id, items } of highlightsContents){
 				if(count > limit) throw new Error("Unexpected error")
 
-				this.Log(`Downloading highlight: ${id.substring(id.indexOf(":") + 1)}`)
+				Log(`Downloading highlight: ${id.substring(id.indexOf(":") + 1)}`)
 
 				for(const item of items){
 					const { url } = GetCorrectContent(item)[0]
@@ -367,7 +394,7 @@ export default class Downloader {
 						try{
 							await this.Download(coverUrl, folder, new Date)
 						}catch(error){
-							this.Log(error)
+							Log(error)
 						}
 					}
 				}
@@ -377,8 +404,8 @@ export default class Downloader {
 		}
 
 		if(hasHighlights){
-			if(count === 0) this.Log("No content found in the highlights")
-		}else this.Log("No highlights found")
+			if(count === 0) Log("No content found in the highlights")
+		}else Log("No highlights found")
 	}
 	/**
 	 * @param {string} user_id
@@ -389,13 +416,13 @@ export default class Downloader {
 	async DownloadStories(user_id, folder, limit = Infinity, username){
 		const results = await this.GetStories(/** @type {`${number}`} */ (user_id), username)
 
-		if(!results) return this.Log("No stories found")
+		if(!results) return Log("No stories found")
 
 		const { items: stories } = results
 
 		if(stories.length){
 			if(!existsSync(folder)) await mkdir(folder, { recursive: true })
-			this.Log("Downloading stories")
+			Log("Downloading stories")
 		}
 
 		let count = 0
@@ -438,7 +465,7 @@ export default class Downloader {
 				if(num_results === 0) break
 
 				if(first){
-					this.Log("Downloading timeline")
+					Log("Downloading timeline")
 					first = false
 				}
 
@@ -452,10 +479,10 @@ export default class Downloader {
 				hasMore = more_available
 				lastId = next_max_id
 				count = data.count
-			}else this.Log(new Error("Failed to get timeline, lastId: " + (lastId || null)))
+			}else Log(new Error("Failed to get timeline, lastId: " + (lastId || null)))
 		}
 
-		if(count === 0) this.Log("No content found in timeline")
+		if(count === 0) Log("No content found in timeline")
 	}
 	/**
 	 * @param {(import("./typings/api.js").FeedItem | import("./typings/api.js").GraphHighlightsMedia | import("./typings/api.js").GraphReelsMedia)[]} items
@@ -519,7 +546,7 @@ export default class Downloader {
 					headers: { Referer: username ? `${BASE_URL}/${username}/` : BASE_URL + "/" }
 				})
 			}catch(error){
-				this.Log(error instanceof Error ? error : new Error(String(error)))
+				Log(error instanceof Error ? error : new Error(String(error)))
 				urls.delete(url)
 			}
 		}))
@@ -653,23 +680,5 @@ export default class Downloader {
 		if(typeof response?.data === "string"){
 			config.app_id = response.data.match(/"X-IG-App-ID":"(\d+)"/)?.[1]
 		}
-	}
-	Log(...args){
-		if(isTesting) return
-
-		const date = new Date().toLocaleString("pt-BR").split(", ")[1]
-
-		if(args.length === 1){
-			const arg = args[0]
-
-			if(arg instanceof Error){
-				const message = arg.cause ? `${arg.message} (${arg.cause})` : arg.message
-				return console.error(chalk.redBright(`[${date}] ${message}`))
-			}
-
-			if(typeof arg === "string") return console.log(`${chalk.blackBright(`[${date}]`)} ${arg}`)
-		}
-
-		console.log(chalk.blackBright(`[${date}]`), ...args)
 	}
 }
