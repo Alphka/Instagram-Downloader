@@ -221,7 +221,8 @@ export default class Downloader {
 		/** @type {import("axios").AxiosResponse<import("./typings/api.js").FacebookAccountAPIResponse>} */
 		const response = await this.Request(new URL(API_FACEBOOK_ACCOUNT, BASE_URL), "POST", {
 			headers: { Referer: BASE_URL + "/" },
-			responseType: "json"
+			responseType: "json",
+			maxRedirects: 0
 		})
 
 		if(typeof response?.data === "object" && "status" in response.data){
@@ -256,6 +257,7 @@ export default class Downloader {
 	 * @param {string} username
 	 */
 	async GetHighlights(user_id, username){
+		const { config } = this
 		const url = new URL(API_QUERY, BASE_URL)
 
 		/** @type {import("axios").AxiosResponse<import("./typings/api.js").QueryHighlightsAPIResponse>} */
@@ -271,8 +273,23 @@ export default class Downloader {
 		})
 
 		try{
-			return response.data.data.highlights.edges.map(({ node }) => node)
+			const { cookie: { sessionid } } = config
+			const { vary } = response.headers
+
+			if(
+				!vary ||
+				!sessionid ||
+				sessionid === '""' ||
+				!vary.includes("Cookie") ||
+				!vary.includes("Accept-Encoding")
+			) throw "Login session expired"
+
+			const { data: { highlights } } = response.data
+
+			return highlights.edges.map(({ node }) => node)
 		}catch(error){
+			if(typeof error === "string") throw new Error(error)
+
 			throw new Error(`Failed to get user (${username || user_id}) highlights`, {
 				cause: /** @type {Error} */ (error).message.replace(/\[?Error\]?:? ?/, "")
 			})
@@ -288,7 +305,12 @@ export default class Downloader {
 
 		first ??= this.queue?.limit ?? 10
 
-		/** @type {import("axios").AxiosResponse<import("./typings/api.js").HighlightsAPIResponse>} */
+		/**
+		 * @type {import("axios").AxiosResponse<
+		 * 	| import("./typings/api.js").HighlightsAPIResponse
+		 * 	| import("./typings/api.js").GraphAPIResponseError
+		 * >
+		 * } */
 		const response = await this.Request(url, "POST", {
 			data: new URLSearchParams({
 				variables: JSON.stringify({
@@ -307,7 +329,15 @@ export default class Downloader {
 			responseType: "json"
 		})
 
-		return response.data.data.xdt_api__v1__feed__reels_media__connection.edges.map(({ node }) => node)
+		const { xdt_api__v1__feed__reels_media__connection: feed } = response.data.data || {}
+
+		if(!feed){
+			const { errors } = /** @type {import("./typings/api.js").GraphAPIResponseError} */ (response.data)
+			const error = errors[0]
+			throw `Error downloading highlights (${error.severity}): ${error.message}`
+		}
+
+		return feed.edges.map(({ node }) => node)
 	}
 	/**
 	 * @param {`${number}`} userId
@@ -461,6 +491,9 @@ export default class Downloader {
 
 			if(typeof response?.data === "object"){
 				const { more_available, num_results, next_max_id, items } = response.data
+
+				if(!Array.isArray(items)) throw new Error(`Couldn't get user timeline, user: ${username}`)
+				if(!items.length) throw new Error(`No items found in timeline, user: ${username}`)
 
 				if(num_results === 0) break
 
@@ -667,7 +700,7 @@ export default class Downloader {
 				}
 			}
 
-			throw error instanceof Error ? new Error(error.name, { cause: error.message }) : error
+			throw error instanceof Error ? new Error(error.name.replace(/\[?Error\]?:? ?/, ""), { cause: error.message }) : error
 		}
 	}
 	async CheckServerConfig(){

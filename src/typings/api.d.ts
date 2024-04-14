@@ -1253,3 +1253,13 @@ export interface StoriesAPIResponse {
 	reels_media: ReelMedia<StoryId>[]
 	status: APIStatus
 }
+
+export interface GraphAPIResponseError {
+	errors: {
+		message: string
+		severity: string
+		extensions: any
+	}[]
+	data: null
+	status: "ok"
+}
