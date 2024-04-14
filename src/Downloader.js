@@ -235,12 +235,17 @@ export default class Downloader {
 			responseType: "json"
 		})
 
-		if(typeof response?.data === "object" && "user" in response.data.data){
-			const { user } = response.data.data
-			return user
+		if(typeof response?.data === "object"){
+			const { data } = response.data
+
+			if(data && "user" in data){
+				return data.user
+			}
+
+			throw new Error(`Failed to get user: ${username}`)
 		}
 
-		return null
+		throw new Error(`User not found: ${username}`)
 	}
 	/** @param {string} username */
 	async GetUserId(username){
