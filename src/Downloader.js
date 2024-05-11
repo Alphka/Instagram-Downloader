@@ -45,7 +45,7 @@ export default class Downloader {
 	/** @type {string} */ output
 	/** @type {string[]} */ usernames
 	/** @type {number | undefined} */ limit
-	/** @type {import("./typings/index.js").Config} */ config
+	/** @type {import("./typings/index.d.ts").Config} */ config
 	/** @type {Queue<ReturnType<typeof this.Download>>} */ queue
 
 	/**
@@ -77,7 +77,7 @@ export default class Downloader {
 	}
 	GetConfig(){
 		if(!existsSync(configPath)){
-			/** @type {import("./typings/index.js").Config} */
+			/** @type {import("./typings/index.d.ts").Config} */
 			const config = this.config = { cookie: {} }
 			this.SetConfig(true)
 			return config
@@ -88,7 +88,7 @@ export default class Downloader {
 		if(!config || typeof config !== "object") throw new TypeError("Invalid type from config.json")
 		if(!config.cookie) config.cookie = {}
 
-		return this.config = /** @type {import("./typings/index.js").Config} */ (config)
+		return this.config = /** @type {import("./typings/index.d.ts").Config} */ (config)
 	}
 	async SetConfig(sync = false){
 		if(isTesting) return
@@ -135,13 +135,7 @@ export default class Downloader {
 
 		headers.Cookie = Object.entries(cookie).map(([key, value]) => `${key}=${value || ""}`).join("; ")
 	}
-	/** @param {{
-	 * 	output: string
-	 * 	timeline?: boolean
-	 * 	highlights?: boolean
-	 * 	stories?: boolean
-	 * 	hcover?: boolean
-	 * }} data */
+	/** @param {Pick<import("./typings/index.d.ts").Options, "output" | "timeline" | "highlights" | "stories" | "hcover">} data */
 	async Init({ output, timeline, highlights, hcover, stories }){
 		Log("Initializing")
 
@@ -175,6 +169,8 @@ export default class Downloader {
 			}
 		}while(true)
 
+		let errored = 0
+
 		for(const username of this.usernames){
 			let user_id
 
@@ -190,6 +186,7 @@ export default class Downloader {
 			}catch(error){
 				if(error instanceof Error) error.message = `User not found: ${username}`
 				Log(error)
+				errored++
 				continue
 			}
 
@@ -203,14 +200,23 @@ export default class Downloader {
 				stories && this.DownloadStories(user_id, folder, this.limit, username)
 			])
 
+			let resultsErrored = 0
+
 			for(const result of results){
 				if(result.status === "rejected"){
 					const { reason } = result
 					if(reason instanceof Error) reason.stack = `Failed to download user's content: ${username}`
 					Log(reason)
+					resultsErrored++
 				}
 			}
+
+			// If no content was downloaded
+			if(resultsErrored === results.length) errored++
 		}
+
+		// If all downloads failed
+		if(errored === this.usernames.length) process.exitCode = 1
 	}
 	async CheckLogin(){
 		/** @type {import("axios").AxiosResponse<import("./typings/api.js").FacebookAccountAPIResponse>} */
@@ -334,7 +340,7 @@ export default class Downloader {
 		if(!feed){
 			const { errors } = /** @type {import("./typings/api.js").GraphAPIResponseError} */ (response.data)
 			const error = errors[0]
-			throw `Error downloading highlights (${error.severity}): ${error.message}`
+			throw new Error(`Error downloading highlights (${error.severity}): ${error.message}`)
 		}
 
 		return feed.edges.map(({ node }) => node)

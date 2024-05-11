@@ -60,6 +60,12 @@ const command = program
 			if(!command.args.length) throw "No usernames provided"
 			if(!options.highlights) options.hcover = false
 
+			if(
+				!options.highlights &&
+				!options.timeline &&
+				!options.stories
+			) throw "Allow download of at least one type of content"
+
 			const output = GetOutputDirectory(options.output, options.force)
 
 			const downloader = new Downloader(
@@ -69,11 +75,12 @@ const command = program
 			)
 
 			await downloader.Init({
-				output,
-				...options
+				...options,
+				output
 			})
 		}catch(error){
 			Log(error instanceof Error ? error : new Error(String(error)))
+			process.exitCode = 1
 		}
 	})
 

@@ -1,7 +1,7 @@
 {
 	"author": "Kayo Souza",
 	"name": "insta-downloader",
-	"version": "3.3.3",
+	"version": "3.3.4",
 	"description": "An application to download content from Instagram",
 	"main": "src/index.js",
 	"scripts": {
@@ -45,7 +45,7 @@
 	},
 	"engines": {
 		"npm": ">=9.8.1",
-		"node": "^18.17 || ^19.2 || ^20.3 || 21"
+		"node": "^18.17 || ^19.2 || >=20.3"
 	},
 	"license": "ISC",
 	"type": "module"
