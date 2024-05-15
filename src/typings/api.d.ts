@@ -1014,7 +1014,7 @@ export interface QueryTimelineAPIResponse {
 }
 
 export interface QueryUserAPIResponse {
-	data: {
+	data?: {
 		user: {
 			biography: string
 			bio_links: any[]
@@ -1076,6 +1076,8 @@ export interface QueryUserAPIResponse {
 			edge_media_collections: any[]
 		}
 	}
+	message?: string
+	status: APIStatus
 }
 
 export interface FacebookAccountAPIResponse {

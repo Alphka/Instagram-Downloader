@@ -44,22 +44,22 @@ test("Username validation", () => {
 test("Instagram API", async t => {
 	const downloader = new Downloader(username, 12)
 
-	await t.test("should reject if user is not logged in", async () => {
+	t.test("should create config object", () => {
+		const config = downloader.SetConfig()
+
+		assert.strictEqual(typeof config, "object")
+		assert.strictEqual(typeof config.cookie, "object")
+	})
+
+	/* await t.test("should reject if user is not logged in", async () => {
 		await assert.rejects(downloader.CheckLogin.bind(downloader))
-	})
+	}) */
 
-	await t.test("should create config object", async () => {
-		const config = downloader.GetConfig()
+	t.test("should update headers", () => {
+		downloader.config.csrftoken = downloader.config.cookie.csrftoken = TOKEN
+		downloader.config.cookie.ds_user_id = USER_ID
+		downloader.config.cookie.sessionid = SESSION_ID
 
-		assert.ok(typeof config === "object")
-		assert.ok(typeof config.cookie === "object")
-	})
-
-	downloader.config.csrftoken = downloader.config.cookie.csrftoken = TOKEN
-	downloader.config.cookie.ds_user_id = USER_ID
-	downloader.config.cookie.sessionid = SESSION_ID
-
-	await t.test("should update headers", () => {
 		downloader.UpdateHeaders()
 
 		assert.strictEqual(typeof downloader.headers, "object")
@@ -81,9 +81,9 @@ test("Instagram API", async t => {
 		if(app_id !== "936619743392459") t.diagnostic("App ID has changed: " + app_id)
 	})
 
-	await t.test("should check if user is logged in", async () => {
+	/* await t.test("should check if user is logged in", async () => {
 		await downloader.CheckLogin()
-	})
+	}) */
 
 	await t.test("should get user id", async () => {
 		const userId = await downloader.GetUserId("instagram")

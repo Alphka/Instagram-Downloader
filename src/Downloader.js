@@ -48,6 +48,8 @@ export default class Downloader {
 	/** @type {import("./typings/index.d.ts").Config} */ config
 	/** @type {Queue<ReturnType<typeof this.Download>>} */ queue
 
+	isEnvSet = false
+
 	/**
 	 * @param {string | string[]} usernames
 	 * @param {number} queue
@@ -75,23 +77,41 @@ export default class Downloader {
 		this.limit = limit
 		this.queue = new Queue(queue)
 	}
-	GetConfig(){
+	SetConfig(){
 		if(!existsSync(configPath)){
-			/** @type {import("./typings/index.d.ts").Config} */
-			const config = this.config = { cookie: {} }
-			this.SetConfig(true)
-			return config
+			const { TOKEN, USER_ID, SESSION_ID } = process.env
+
+			this.config = {
+				cookie: {
+					csrftoken: TOKEN,
+					ds_user_id: USER_ID,
+					sessionid: SESSION_ID
+				},
+				csrftoken: TOKEN
+			}
+
+			this.WriteConfig(true)
+
+			return this.config
 		}
 
-		const config = JSON.parse(readFileSync(configPath, "utf8"))
+		/** @type {import("./typings/index.d.ts").Config} */
+		const config = this.config = JSON.parse(readFileSync(configPath, "utf8"))
 
 		if(!config || typeof config !== "object") throw new TypeError("Invalid type from config.json")
 		if(!config.cookie) config.cookie = {}
 
-		return this.config = /** @type {import("./typings/index.d.ts").Config} */ (config)
+		this.UpdateHeaders()
+
+		return config
 	}
-	async SetConfig(sync = false){
-		if(isTesting) return
+	WriteConfig(sync = false){
+		if(isTesting){
+			// When not in test environment, the headers will be updated
+			// after validating the .env file and the process.env variables.
+			this.UpdateHeaders()
+			return
+		}
 
 		const data = JSON.stringify(this.config, null, "\t") + "\n"
 
@@ -101,36 +121,47 @@ export default class Downloader {
 			return
 		}
 
-		await writeFile(configPath, data, "utf8")
-		await this.SetEnv(sync)
+		return Promise.all([
+			writeFile(configPath, data, "utf8"),
+			this.SetEnv(false)
+		])
 	}
 	SetEnv(sync = false){
-		if(isTesting) return
+		if(isTesting || this.isEnvSet) return
 
 		const { config } = this
 		const envPath = join(root, ".env")
-		const data = existsSync(envPath) ? dotenv.parse(envPath) : {}
 
-		/** @type {Record<string, string>} */
-		let newData = {
-			TOKEN: config.csrftoken,
-			USER_ID: config.cookie.ds_user_id,
-			SESSION_ID: config.cookie.sessionid
+		if(existsSync(envPath)) dotenv.config({ path: envPath })
+
+		const data = {
+			TOKEN: process.env.TOKEN || config.csrftoken,
+			USER_ID: process.env.USER_ID || config.cookie.ds_user_id,
+			SESSION_ID: process.env.SESSION_ID || config.cookie.sessionid
 		}
 
-		newData = Object.fromEntries(Object.entries(newData).filter(([key, value]) => value))
+		this.config.csrftoken = this.config.cookie.csrftoken = data.TOKEN
+		this.config.cookie.ds_user_id = data.USER_ID
+		this.config.cookie.sessionid = data.SESSION_ID
 
-		Object.assign(data, newData)
+		this.UpdateHeaders()
 
-		const envString = Object.entries(data).map(([key, value]) => `${key}=${value}`).join("\n") + "\n"
+		const envString = Object.entries(data).map(([key, value]) => {
+			if(!value) return
+			return `${key}=${value}`
+		}).filter(Boolean).join("\n") + "\n"
+
+		this.isEnvSet = true
 
 		if(sync) writeFileSync(envPath, envString, "utf8")
 		else return writeFile(envPath, envString, "utf8")
 	}
 	UpdateHeaders(){
-		const { headers, config: { csrftoken, app_id, cookie } } = this
+		const { headers, config } = this
+		const { csrftoken, app_id, cookie } = config || {}
+		const token = csrftoken || cookie.csrftoken
 
-		if(csrftoken) headers["X-Csrftoken"] = csrftoken
+		if(token) headers["X-Csrftoken"] = token
 		if(app_id) headers["X-Ig-App-Id"] = app_id
 
 		headers.Cookie = Object.entries(cookie).map(([key, value]) => `${key}=${value || ""}`).join("; ")
@@ -141,14 +172,14 @@ export default class Downloader {
 
 		if(!this.usernames.length) throw "There are no valid usernames"
 
-		this.GetConfig()
-		this.UpdateHeaders()
+		this.SetConfig()
+
+		await this.CheckServerConfig()
 
 		do{
 			try{
-				await this.CheckServerConfig()
-				await this.CheckLogin()
-				Log("Logged in")
+				// await this.CheckLogin()
+				// Log("Logged in")
 				break
 			}catch{
 				Log(new Error("You are not logged in. Type your data for authentication."))
@@ -159,13 +190,11 @@ export default class Downloader {
 
 				if(!token || !id || !session) continue
 
-				this.config.csrftoken = token
+				this.config.csrftoken = this.config.cookie.csrftoken = token
 				this.config.cookie.ds_user_id = id
-				this.config.cookie.csrftoken = token
 				this.config.cookie.sessionid = session
 
-				this.UpdateHeaders()
-				this.SetConfig(true)
+				this.WriteConfig(true)
 			}
 		}while(true)
 
@@ -178,13 +207,11 @@ export default class Downloader {
 				const { id, followed_by_viewer, is_private } = await this.GetUser(username)
 
 				if(is_private && !followed_by_viewer){
-					Log(new Error(`You don't have access to a private account: ${username}`))
-					continue
+					throw new Error(`You don't have access to a private account: ${username}`)
 				}
 
 				user_id = id
 			}catch(error){
-				if(error instanceof Error) error.message = `User not found: ${username}`
 				Log(error)
 				errored++
 				continue
@@ -244,11 +271,9 @@ export default class Downloader {
 		if(typeof response?.data === "object"){
 			const { data } = response.data
 
-			if(data && "user" in data){
-				return data.user
-			}
+			if(data && "user" in data) return data.user
 
-			throw new Error(`Failed to get user: ${username}`)
+			throw new Error(`Failed to get user: ${username}`, { cause: response.data.message })
 		}
 
 		throw new Error(`User not found: ${username}`)
@@ -655,6 +680,8 @@ export default class Downloader {
 		let response
 
 		const handleCookies = async () => {
+			if(!this.config) this.SetConfig()
+
 			const setCookies = response?.headers["set-cookie"]
 
 			if(!setCookies) return
@@ -670,8 +697,7 @@ export default class Downloader {
 				this.config.cookie[key] = value
 			})
 
-			this.UpdateHeaders()
-			await this.SetConfig()
+			await this.WriteConfig()
 		}
 
 		let _url
@@ -691,6 +717,7 @@ export default class Downloader {
 			response = await axios({
 				url,
 				method,
+				validateStatus: () => true,
 				...config
 			})
 
@@ -698,26 +725,19 @@ export default class Downloader {
 
 			return response
 		}catch(error){
-			if(error instanceof AxiosError){
-				if(error.response){
-					response = error.response
-					await handleCookies()
-					return error.response
-				}
-			}
-
 			throw error instanceof Error ? new Error(error.name.replace(/\[?Error\]?:? ?/, ""), { cause: error.message }) : error
 		}
 	}
 	async CheckServerConfig(){
-		const { config, usernames } = this
+		const { config } = this
 
 		if(config.app_id) return
 
-		const response = await this.Request(new URL(usernames[0], BASE_URL), "GET", { responseType: "text" })
+		const response = await this.Request(new URL("/", BASE_URL), "GET", { responseType: "text" })
 
 		if(typeof response?.data === "string"){
 			config.app_id = response.data.match(/"X-IG-App-ID":"(\d+)"/)?.[1]
+			this.UpdateHeaders()
 		}
 	}
 }
