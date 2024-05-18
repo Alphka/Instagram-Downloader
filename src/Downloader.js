@@ -1,15 +1,16 @@
-import { BASE_URL, API_FACEBOOK_ACCOUNT, API_USERID_TEMPLATE, API_QUERY, API_REELS, API_FEED_TEMPLATE } from "./config.js"
+import { BASE_URL, API_FACEBOOK_ACCOUNT, API_QUERY, API_REELS, API_FEED_TEMPLATE, API_GRAPHQL } from "./config.js"
 import { existsSync, readFileSync, writeFileSync, createWriteStream } from "fs"
 import { mkdir, writeFile, utimes } from "fs/promises"
 import { dirname, join, parse } from "path"
 import { fileURLToPath } from "url"
 import GetCorrectContent from "./helpers/GetCorrectContent.js"
 import ValidateUsername from "./helpers/ValidateUsername.js"
+import FindRegexArray from "./helpers/FindRegexArray.js"
 import GetURLFilename from "./helpers/GetURLFilename.js"
 import Question from "./helpers/Question.js"
-import Queue from "./Queue.js"
-import axios, { AxiosError } from "axios"
 import dotenv from "dotenv"
+import Queue from "./Queue.js"
+import axios from "axios"
 import sharp from "sharp"
 import mime from "mime"
 import Log from "./helpers/Log.js"
@@ -24,8 +25,8 @@ const isTesting = process.env.npm_command === "test" || process.env.npm_lifecycl
 
 Object.assign(axios.defaults.headers.common, {
 	"Sec-Ch-Prefers-Color-Scheme": "dark",
-	"Sec-Ch-Ua": '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
-	"Sec-Ch-Ua-Full-version-list": '"Not A(Brand";v="99.0.0.0", "Google Chrome";v="121.0.6167.185", "Chromium";v="121.0.6167.185"',
+	"Sec-Ch-Ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+	"Sec-Ch-Ua-Full-Version-List": '"Chromium";v="124.0.6367.208", "Google Chrome";v="124.0.6367.208", "Not-A.Brand";v="99.0.0.0"',
 	"Sec-Ch-Ua-Mobile": "?0",
 	"Sec-Ch-Ua-Model": '""',
 	"Sec-Ch-Ua-Platform": '"Windows"',
@@ -33,8 +34,22 @@ Object.assign(axios.defaults.headers.common, {
 	"Sec-Fetch-Site": "same-origin",
 	"Sec-Fetch-Dest": "empty",
 	"Sec-Fetch-Mode": "cors",
-	"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+	"Upgrade-Insecure-Requests": "1",
+	"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 })
+
+const userIdRegexArray = [
+	/{"id":"(\d+)","profile_pic_url"/,
+	/{"query_id":"\d+","user_id":"(\d+)"/,
+	/{"content_type":"PROFILE","target_id":"(\d+)"}/,
+	/"profile_id":"(\d+)"/,
+	/profilePage_(\d+)/,
+]
+
+const fbTokenRegexArray = [
+	/"s":"XPolarisProfileController","w":0,"f":"([\w-]+:\d+:\d+)","l":/,
+	/"token":"([\w-]+:\d+:\d+)"/
+]
 
 export default class Downloader {
 	/** @type {import("./typings/api.js").APIHeaders} */ headers = {
@@ -47,6 +62,7 @@ export default class Downloader {
 	/** @type {number | undefined} */ limit
 	/** @type {import("./typings/index.d.ts").Config} */ config
 	/** @type {Queue<ReturnType<typeof this.Download>>} */ queue
+	/** @type {string | undefined} */ fbToken
 
 	isEnvSet = false
 
@@ -201,30 +217,30 @@ export default class Downloader {
 		let errored = 0
 
 		for(const username of this.usernames){
-			let user_id
+			const userId = await this.GetUserId(username)
 
 			try{
-				const { id, followed_by_viewer, is_private } = await this.GetUser(username)
+				if(!userId) throw new Error(`Failed to get user ID: ${username}`)
 
-				if(is_private && !followed_by_viewer){
+				const { is_private, friendship_status: { followed_by } } = await this.GetUser(userId, username)
+
+				if(is_private && !followed_by){
 					throw new Error(`You don't have access to a private account: ${username}`)
 				}
-
-				user_id = id
 			}catch(error){
 				Log(error)
 				errored++
 				continue
 			}
 
-			Log(`Downloading from user: ${username}, id: ${user_id}`)
+			Log(`Downloading from user: ${username}, id: ${userId}`)
 
 			const folder = join(output, username)
 
 			const results = await Promise.allSettled([
 				timeline && this.DownloadTimeline(username, folder),
-				highlights && this.DownloadHighlights(user_id, folder, hcover, this.limit, username),
-				stories && this.DownloadStories(user_id, folder, this.limit, username)
+				highlights && this.DownloadHighlights(userId, folder, hcover, this.limit, username),
+				stories && this.DownloadStories(userId, folder, this.limit, username)
 			])
 
 			let resultsErrored = 0
@@ -260,11 +276,26 @@ export default class Downloader {
 
 		throw new Error("User is not logged in")
 	}
-	/** @param {string} username */
-	async GetUser(username){
+	/**
+	 * @param {string} userId
+	 * @param {string} [username]
+	 */
+	async GetUser(userId, username){
+		const { fbToken } = this
+
 		/** @type {import("axios").AxiosResponse<import("./typings/api.js").QueryUserAPIResponse>} */
-		const response = await this.Request(new URL(API_USERID_TEMPLATE.replace("<username>", username), BASE_URL), "GET", {
-			headers: { Referer: `${BASE_URL}/${username}/` },
+		const response = await this.Request(new URL(API_GRAPHQL, BASE_URL), "POST", {
+			data: new URLSearchParams({
+				fb_dtsg: fbToken,
+				variables: JSON.stringify({
+					id: userId,
+					render_surface: "PROFILE"
+				}),
+				doc_id: "25313068075003303"
+			}),
+			headers: {
+				Referer: username ? this.GetUserProfileLink(username) : BASE_URL + "/"
+			},
 			responseType: "json"
 		})
 
@@ -273,32 +304,62 @@ export default class Downloader {
 
 			if(data && "user" in data) return data.user
 
-			throw new Error(`Failed to get user: ${username}`, { cause: response.data.message })
+			throw new Error(`Failed to get user: ${username} (${userId})`)
 		}
 
 		throw new Error(`User not found: ${username}`)
 	}
 	/** @param {string} username */
+	GetUserProfileLink(username){
+		return `${BASE_URL}/${username}/`
+	}
+	/** @param {string} username */
 	async GetUserId(username){
-		const { id } = await this.GetUser(username)
-		return id
+		const url = this.GetUserProfileLink(username)
+
+		try{
+			/** @type {import("axios").AxiosResponse<string>} */
+			const { data } = await this.Request(url, "GET", {
+				headers: {
+					Accept: "text/html,*\/*;q=0.8",
+					Priority: "u=0, i",
+					"Sec-Fetch-Dest": "document",
+					"Sec-Fetch-Mode": "navigate",
+					"Sec-Fetch-Site": "same-origin",
+					"Sec-Fetch-User": "?1"
+				},
+				responseType: "text"
+			})
+
+			try{
+				const fbToken = FindRegexArray(data, fbTokenRegexArray)
+				if(!fbToken) throw "Token was not found"
+
+				this.fbToken = fbToken
+			}catch(error){
+				Log(new Error("Failed to set facebook token", { cause: error }))
+			}
+
+			return FindRegexArray(data, userIdRegexArray) || null
+		}catch(error){
+			throw new Error(`Failed to get user ID (${username})`, { cause: error })
+		}
 	}
 	/**
 	 * @param {string} user_id
-	 * @param {string} username
+	 * @param {string} [username]
 	 */
 	async GetHighlights(user_id, username){
 		const { config } = this
-		const url = new URL(API_QUERY, BASE_URL)
 
 		/** @type {import("axios").AxiosResponse<import("./typings/api.js").QueryHighlightsAPIResponse>} */
-		const response = await this.Request(url, "POST", {
+		const response = await this.Request(new URL(API_QUERY, BASE_URL), "POST", {
 			data: new URLSearchParams({
 				variables: JSON.stringify({ user_id }),
 				doc_id: "8298007123561120"
 			}),
 			headers: {
-				Referer: username ? `${BASE_URL}/${username}/` : BASE_URL + "/"
+				Referer: username ? this.GetUserProfileLink(username) : BASE_URL + "/"
 			},
 			responseType: "json"
 		})
@@ -311,8 +372,7 @@ export default class Downloader {
 				!vary ||
 				!sessionid ||
 				sessionid === '""' ||
-				!vary.includes("Cookie") ||
-				!vary.includes("Accept-Encoding")
+				!vary.includes("Cookie")
 			) throw "Login session expired"
 
 			const { data: { highlights } } = response.data
@@ -332,8 +392,6 @@ export default class Downloader {
 	 * @param {number} [first]
 	 */
 	async GetHighlightsContents(reelsIds, username, first){
-		const url = new URL(API_QUERY, BASE_URL)
-
 		first ??= this.queue?.limit ?? 10
 
 		/**
@@ -342,7 +400,7 @@ export default class Downloader {
 		 * 	| import("./typings/api.js").GraphAPIResponseError
 		 * >
 		 * } */
-		const response = await this.Request(url, "POST", {
+		const response = await this.Request(new URL(API_QUERY, BASE_URL), "POST", {
 			data: new URLSearchParams({
 				variables: JSON.stringify({
 					after: null,
@@ -355,7 +413,7 @@ export default class Downloader {
 				doc_id: "25536143079310158"
 			}),
 			headers: {
-				Referer: username ? `${BASE_URL}/${username}/` : BASE_URL + "/"
+				Referer: username ? this.GetUserProfileLink(username) : BASE_URL + "/"
 			},
 			responseType: "json"
 		})
@@ -364,8 +422,8 @@ export default class Downloader {
 
 		if(!feed){
 			const { errors } = /** @type {import("./typings/api.js").GraphAPIResponseError} */ (response.data)
-			const error = errors[0]
-			throw new Error(`Error downloading highlights (${error.severity}): ${error.message}`)
+			const error = errors?.[0]
+			throw new Error(`Error downloading highlights ${error ? `(${error.severity}): ${error.message}` : ""}`)
 		}
 
 		return feed.edges.map(({ node }) => node)
@@ -381,7 +439,7 @@ export default class Downloader {
 
 		/** @type {import("axios").AxiosResponse<import("./typings/api.js").StoriesAPIResponse>} */
 		const response = await this.Request(url, "GET", {
-			headers: { Referer: username ? `${BASE_URL}/${username}/` : BASE_URL + "/" },
+			headers: { Referer: username ? this.GetUserProfileLink(username) : BASE_URL + "/" },
 			responseType: "json"
 		})
 
@@ -607,7 +665,7 @@ export default class Downloader {
 		await Promise.all(Array.from(urls.entries()).map(async ([url, date]) => {
 			try{
 				await this.Download(url, folder, date, undefined, {
-					headers: { Referer: username ? `${BASE_URL}/${username}/` : BASE_URL + "/" }
+					headers: { Referer: username ? this.GetUserProfileLink(username) : BASE_URL + "/" }
 				})
 			}catch(error){
 				Log(error instanceof Error ? error : new Error(String(error)))
@@ -626,31 +684,32 @@ export default class Downloader {
 	 * @param {Date | number} [date]
 	 * @param {string} [filename]
 	 * @param {import("axios").AxiosRequestConfig} [config]
-	 * @returns {Promise<string>}
+	 * @returns {Promise<string | undefined>}
 	 */
 	async Download(url, folder, date = new Date, filename = "", config = {}){
 		if(!filename) filename = GetURLFilename(url)
 
 		const { name, ext } = parse(filename)
 
-		if(/^image\/.+$/.test(mime.getType(ext))){
-			return this.queue.add(async () => {
-				Object.assign(config, { responseType: "arraybuffer" })
+		if(/^image\/.+$/.test(mime.getType(ext))) return this.queue.add(async () => {
+			Object.assign(config, { responseType: "arraybuffer" })
 
-				/** @type {import("axios").AxiosResponse<Buffer>} */
-				const { data, status } = await this.Request(url, "GET", config)
+			/** @type {import("axios").AxiosResponse<Buffer>} */
+			const { data, status } = await this.Request(url, "GET", config)
 
-				if(status < 200 || status >= 300) throw new Error(`Request to media ${filename} failed with status ${status}`)
+			if(status < 200 || status >= 300){
+				Log(new Error(`Request to media ${filename} failed with status ${status}`))
+				return
+			}
 
-				const { format } = await sharp(data).metadata()
-				const path = join(folder, `${name}.${format === "jpeg" ? "jpg" : format}`)
+			const { format } = await sharp(data).metadata()
+			const path = join(folder, `${name}.${format === "jpeg" ? "jpg" : format}`)
 
-				await writeFile(path, data)
-				await utimes(path, new Date, date)
+			await writeFile(path, data)
+			await utimes(path, new Date, date)
 
-				return path
-			})
-		}
+			return path
+		})
 
 		return this.queue.add(async () => {
 			Object.assign(config, { responseType: "stream" })
@@ -674,30 +733,9 @@ export default class Downloader {
 	 * @param {Omit<import("axios").AxiosRequestConfig, "url" | "method">} [config]
 	 */
 	async Request(url, method = "GET", config = {}){
-		config.headers = Object.assign({}, this.headers, config.headers || {})
-
-		/** @type {import("axios").AxiosResponse<T>} */
-		let response
-
-		const handleCookies = async () => {
-			if(!this.config) this.SetConfig()
-
-			const setCookies = response?.headers["set-cookie"]
-
-			if(!setCookies) return
-
-			setCookies.forEach(cookieConfig => {
-				const [key, ...values] = cookieConfig.split(";")[0].split("=")
-
-				if(key === "th_eu_pref") return
-
-				const value = encodeURIComponent(values.join("="))
-
-				if(key === "csrftoken") this.config.csrftoken = value
-				this.config.cookie[key] = value
-			})
-
-			await this.WriteConfig()
+		config.headers = {
+			...this.headers,
+			...(config.headers || {})
 		}
 
 		let _url
@@ -709,19 +747,34 @@ export default class Downloader {
 			_url = new URL(url)
 		}
 
-		Object.assign(config.headers, {
-			"Sec-Fetch-Site": BASE_URL === _url.origin ? "same-origin" : "cross-site"
-		})
+		config.headers = {
+			"Sec-Fetch-Site": BASE_URL === _url.origin ? "same-origin" : "cross-site",
+			...config.headers
+		}
 
 		try{
-			response = await axios({
+			/** @type {import("axios").AxiosResponse<T>} */
+			const response = await axios({
 				url,
 				method,
 				validateStatus: () => true,
 				...config
 			})
 
-			await handleCookies()
+			if(!this.config) this.SetConfig()
+
+			response?.headers["set-cookie"]?.forEach(cookieConfig => {
+				const [key, ...values] = cookieConfig.split(";")[0].split("=")
+
+				if(key === "th_eu_pref") return
+
+				const value = encodeURIComponent(values.join("="))
+
+				if(key === "csrftoken") this.config.csrftoken = value
+				this.config.cookie[key] = value
+			})
+
+			await this.WriteConfig()
 
 			return response
 		}catch(error){
@@ -736,7 +789,24 @@ export default class Downloader {
 		const response = await this.Request(new URL("/", BASE_URL), "GET", { responseType: "text" })
 
 		if(typeof response?.data === "string"){
-			config.app_id = response.data.match(/"X-IG-App-ID":"(\d+)"/)?.[1]
+			try{
+				const appId = response.data.match(/"X-IG-App-ID":"(\d+)"/)?.[1]
+				if(!appId) throw "App ID was not found"
+
+				config.app_id = appId
+			}catch(error){
+				Log(new Error("Failed to set App ID", { cause: error }))
+			}
+
+			try{
+				const fbToken = FindRegexArray(response.data, fbTokenRegexArray)
+				if(!fbToken) throw "Token was not found"
+
+				this.fbToken = fbToken
+			}catch(error){
+				Log(new Error("Failed to set Facebook token", { cause: error }))
+			}
+
 			this.UpdateHeaders()
 		}
 	}

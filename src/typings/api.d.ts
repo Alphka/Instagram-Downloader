@@ -1018,66 +1018,95 @@ export interface QueryUserAPIResponse {
 		user: {
 			biography: string
 			bio_links: any[]
-			biography_with_entities: any[]
-			blocked_by_viewer: boolean
-			restricted_by_viewer: boolean
-			country_block: boolean
-			external_url: null
-			external_url_linkshimmed: null
-			edge_followed_by: any[]
-			fbid: string
-			followed_by_viewer: boolean
-			edge_follow: any[]
-			follows_viewer: boolean
+			biography_with_entities: {
+				entities: (null | {
+					hashtag: null
+					user: {
+						username: string
+						id: string
+					}
+				})[]
+			}
+			external_url: string
+			external_lynx_url: null
 			full_name: string
-			group_metadata: null
-			has_ar_effects: boolean
-			has_clips: boolean
-			has_guides: boolean
-			has_channel: boolean
-			has_blocked_viewer: boolean
-			highlight_reel_count: number
-			has_requested_viewer: boolean
-			hide_like_and_view_counts: true
 			id: string
-			is_business_account: boolean
-			is_professional_account: true
-			is_supervision_enabled: boolean
-			is_guardian_of_viewer: boolean
-			is_supervised_by_viewer: boolean
-			is_supervised_user: boolean
-			is_embeds_disabled: boolean
-			is_joined_recently: boolean
-			guardian_id: null
-			business_address_json: null
-			business_contact_method: "UNKNOWN"
-			business_email: null
-			business_phone_number: null
-			business_category_name: null
-			overall_category_name: null
-			category_enum: null
-			category_name: string
+			friendship_status: {
+				following: boolean
+				blocking: boolean
+				is_feed_favorite: boolean
+				outgoing_request: boolean
+				followed_by: boolean
+				incoming_request: boolean
+				is_restricted: boolean
+				is_bestie: boolean
+				muting: boolean
+				is_muting_reel: boolean
+			}
+			gating: null
+			is_memorialized: boolean
 			is_private: boolean
 			is_verified: boolean
-			edge_mutual_followed_by: any[]
-			profile_pic_url: string
-			profile_pic_url_hd: string
-			requested_by_viewer: boolean
-			should_show_category: boolean
-			should_show_public_contacts: boolean
-			transparency_label: null
-			transparency_product: "STATE_CONTROLLED_MEDIA"
+			has_story_archive: null
 			username: string
-			connected_fb_page: null
-			pronouns: []
-			edge_felix_video_timeline: any[]
-			edge_owner_to_timeline_media: any[]
-			edge_saved_media: any[]
-			edge_media_collections: any[]
+			supervision_info: null
+			is_regulated_c18: boolean
+			regulated_news_in_locations: any[]
+			text_post_app_badge_label: null
+			show_text_post_app_badge: null
+			eligible_for_text_app_activation_badge: boolean
+			hide_text_app_activation_badge_on_text_app: null
+			pk: string
+			live_broadcast_visibility: null
+			live_broadcast_id: null
+			profile_pic_url: string
+			hd_profile_pic_url_info: {
+				url: string
+			}
+			is_unpublished: false
+			mutual_followers_count: number
+			profile_context_links_with_user_ids: {
+				username: string
+				id: string | null
+			}[]
+			account_badges: []
+			ai_agent_type: null
+			has_chaining: true
+			fbid_v2: string
+			interop_messaging_user_fbid: string
+			account_type: number
+			is_embeds_disabled: boolean
+			show_account_transparency_details: boolean
+			is_professional_account: null
+			follower_count: number
+			address_street: null
+			city_name: null
+			is_business: boolean
+			zip: null
+			category: null
+			should_show_category: null
+			pronouns: string[]
+			transparency_label: null
+			transparency_product: null
+			following_count: number
+			media_count: number
+			latest_reel_media: number | null
+			total_clips_count: number | null
+			latest_besties_reel_media: number | null
+			reel_media_seen_timestamp: number | null
+		}
+		viewer: {
+			user: {
+				pk: string
+				id: string
+				can_see_organic_insights: boolean
+				has_onboarded_to_text_post_app: boolean
+			}
 		}
 	}
-	message?: string
-	status: APIStatus
+	extensions: {
+		is_final: boolean
+	}
 }
 
 export interface FacebookAccountAPIResponse {

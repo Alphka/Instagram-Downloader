@@ -1,7 +1,7 @@
 {
 	"author": "Kayo Souza",
 	"name": "insta-downloader",
-	"version": "3.4.0",
+	"version": "3.4.1",
 	"description": "An application to download content from Instagram",
 	"main": "src/index.js",
 	"scripts": {
@@ -25,11 +25,11 @@
 		"commander": "~12.0.0",
 		"dotenv": "~16.4.5",
 		"mime": "~3.0.0",
-		"sharp": "~0.33.3"
+		"sharp": "~0.33.4"
 	},
 	"devDependencies": {
 		"@types/mime": "~3.0.4",
-		"@types/node": "^20.12.11",
+		"@types/node": "^20.12.12",
 		"@types/sharp": "~0.31.1",
 		"typescript": "^5.4.5"
 	},
