@@ -222,11 +222,9 @@ export default class Downloader {
 			try{
 				if(!userId) throw new Error(`Failed to get user ID: ${username}`)
 
-				const { is_private, friendship_status: { followed_by } } = await this.GetUser(userId, username)
+				const { is_private, friendship_status: { following } } = await this.GetUser(userId, username)
 
-				if(is_private && !followed_by){
-					throw new Error(`You don't have access to a private account: ${username}`)
-				}
+				if(is_private && !following) throw new Error(`You don't have access to a private account: ${username}`)
 			}catch(error){
 				Log(error)
 				errored++
