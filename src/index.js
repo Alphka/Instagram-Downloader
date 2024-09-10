@@ -1,10 +1,9 @@
 #!/usr/bin/env node --no-warnings
 
 import { dirname, isAbsolute, join, relative, resolve } from "path"
-import { existsSync, mkdirSync } from "fs"
+import { existsSync, mkdirSync, readFileSync } from "fs"
 import { fileURLToPath } from "url"
 import { program } from "commander"
-import packageConfig from "../package.json" assert { type: "json" }
 import Downloader from "./Downloader.js"
 import isNumber from "./helpers/isNumber.js"
 import config from "./config.js"
@@ -12,9 +11,10 @@ import Log from "./helpers/Log.js"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
-
-const cwd = process.cwd()
 const root = join(__dirname, "..")
+const cwd = process.cwd()
+
+const packageInfo = /** @type {import("../package.json")} */ (JSON.parse(readFileSync(join(root, "package.json"), "utf8")))
 
 /**
  * @param {string | undefined} directory
@@ -44,9 +44,9 @@ function GetOutputDirectory(directory, force){
 }
 
 const command = program
-	.name(packageConfig.bin && Object.keys(packageConfig.bin)[0] || packageConfig.name)
-	.version(packageConfig.version, "-v, --version", "Display program version")
-	.description(packageConfig.description)
+	.name(packageInfo.bin && Object.keys(packageInfo.bin)[0] || packageInfo.name)
+	.version(packageInfo.version, "-v, --version", "Display program version")
+	.description(packageInfo.description)
 	.argument(config.argument.name, config.argument.description)
 	.helpOption("-h, --help", "Display help")
 	.action(
