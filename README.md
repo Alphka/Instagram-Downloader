@@ -44,6 +44,11 @@ npm install
 npm link
 ```
 
+> [!NOTE]
+> Before executing the CLI program, copy the contents of the file `.env.example` to a new file named `.env` and
+> fill all the environment variables there with your account credentials that are stored in the browser's cookies.
+> This program will not work without authentication.
+
 ### License
 
 [ISC](LICENSE.md) © 2023 Kayo Souza
