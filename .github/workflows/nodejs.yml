@@ -27,7 +27,7 @@ jobs:
         with:
           version: 9
           run_install: |
-            - recursive: true
+            - recursive: false
               args: [--frozen-lockfile]
 
       - name: Install Node.js ${{ matrix.node-version }}
