@@ -24,18 +24,23 @@ const configPath = join(root, "config.json")
 const isTesting = process.env.npm_command === "test" || process.env.npm_lifecycle_event === "test"
 
 Object.assign(axios.defaults.headers.common, {
+	"Accept-Language": "en-US,en;q=0.9",
+	Dpr: "1",
 	"Sec-Ch-Prefers-Color-Scheme": "dark",
-	"Sec-Ch-Ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
-	"Sec-Ch-Ua-Full-Version-List": '"Chromium";v="124.0.6367.208", "Google Chrome";v="124.0.6367.208", "Not-A.Brand";v="99.0.0.0"',
+	"Sec-Ch-Ua": "\"Google Chrome\";v=\"129\", \"Not=A?Brand\";v=\"8\", \"Chromium\";v=\"129\"",
+	"Sec-Ch-Ua-Full-Version-List": "\"Google Chrome\";v=\"129.0.6668.58\", \"Not=A?Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"129.0.6668.58\"",
 	"Sec-Ch-Ua-Mobile": "?0",
-	"Sec-Ch-Ua-Model": '""',
-	"Sec-Ch-Ua-Platform": '"Windows"',
-	"Sec-Ch-Ua-Platform-version": '"15.0.0"',
-	"Sec-Fetch-Site": "same-origin",
+	"Sec-Ch-Ua-Model": "\"\"",
+	"Sec-Ch-Ua-Platform": "\"Windows\"",
+	"Sec-Ch-Ua-Platform-version": "\"15.0.0\"",
 	"Sec-Fetch-Dest": "empty",
 	"Sec-Fetch-Mode": "cors",
 	"Upgrade-Insecure-Requests": "1",
-	"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+	"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36"
+})
+
+Object.assign(axios.defaults.headers.get, {
+	"Viewport-Width": "1920"
 })
 
 const userIdRegexArray = [
@@ -319,12 +324,13 @@ export default class Downloader {
 			/** @type {import("axios").AxiosResponse<string>} */
 			const { data } = await this.Request(url, "GET", {
 				headers: {
-					Accept: "text/html,*\/*;q=0.8",
+					Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
 					Priority: "u=0, i",
 					"Sec-Fetch-Dest": "document",
 					"Sec-Fetch-Mode": "navigate",
-					"Sec-Fetch-Site": "same-origin",
-					"Sec-Fetch-User": "?1"
+					"Sec-Fetch-User": "?1",
+					"X-Csrftoken": undefined,
+					"X-Ig-App-Id": undefined
 				},
 				responseType: "text"
 			})
@@ -746,6 +752,8 @@ export default class Downloader {
 		}
 
 		config.headers = {
+			Host: _url.host,
+			Origin: _url.origin,
 			"Sec-Fetch-Site": BASE_URL === _url.origin ? "same-origin" : "cross-site",
 			...config.headers
 		}

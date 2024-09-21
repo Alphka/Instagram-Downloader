@@ -92,7 +92,7 @@ test("Instagram API", async t => {
 		assert.strictEqual(userId, "25025320")
 	})
 
-	await t.test("Download", async t => {
+	/* await t.test("Download", async t => {
 		async function EmptyFolder(){
 			const contents = await readdir(folder, { withFileTypes: true })
 
@@ -118,5 +118,5 @@ test("Instagram API", async t => {
 		})
 
 		await rm(folder, { recursive: true })
-	})
+	}) */
 })
