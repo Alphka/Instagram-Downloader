@@ -24,6 +24,18 @@ const config = {
 			defaultValue: false
 		},
 		{
+			option: "open",
+			alternative: "O",
+			description: "Open output folders when finished",
+			defaultValue: false
+		},
+		{
+			option: "unifolder",
+			alternative: "uf",
+			description: "Downloads the contents in the parent folder, instead of subdirectories.",
+			defaultValue: false
+		},
+		{
 			option: "queue",
 			alternative: "q",
 			description: "Set how many items to get from Instagram API",
