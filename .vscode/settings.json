@@ -1,0 +1,16 @@
+{
+	"json.schemas": [
+		{
+			"fileMatch": [
+				".ncurc",
+				".ncurc.json"
+			],
+			"url": "https://raw.githubusercontent.com/raineorshine/npm-check-updates/main/src/types/RunOptions.json"
+		}
+	],
+	"yaml.schemas": {
+		"https://raw.githubusercontent.com/raineorshine/npm-check-updates/main/src/types/RunOptions.json": [
+			".ncurc.yml"
+		]
+	}
+}

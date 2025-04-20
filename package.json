@@ -20,17 +20,22 @@
 		"videos"
 	],
 	"dependencies": {
-		"axios": "~1.7.7",
-		"chalk": "^5.3.0",
-		"commander": "~12.1.0",
-		"dotenv": "~16.4.5",
-		"mime": "~3.0.0",
-		"sharp": "~0.33.5"
+		"axios": "^1.8.4",
+		"chalk": "^5.4.1",
+		"commander": "^12.1.0",
+		"dotenv": "^16.5.0",
+		"mime": "^3.0.0",
+		"sharp": "^0.34.1"
 	},
 	"devDependencies": {
-		"@types/mime": "~3.0.4",
-		"@types/node": "^20.16.5",
-		"typescript": "~5.5.4"
+		"@types/mime": "^3.0.4",
+		"@types/node": "^22.14.1",
+		"typescript": "^5.8.3"
+	},
+	"pnpm": {
+		"onlyBuiltDependencies": [
+			"sharp"
+		]
 	},
 	"repository": {
 		"type": "git",

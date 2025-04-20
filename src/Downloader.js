@@ -24,19 +24,19 @@ const configPath = join(root, "config.json")
 const isTesting = process.env.npm_command === "test" || process.env.npm_lifecycle_event === "test"
 
 Object.assign(axios.defaults.headers.common, {
+	"Accept-Encoding": "gzip, deflate, br",
 	"Accept-Language": "en-US,en;q=0.9",
+	Dnt: "1",
 	Dpr: "1",
-	"Sec-Ch-Prefers-Color-Scheme": "dark",
-	"Sec-Ch-Ua": "\"Google Chrome\";v=\"129\", \"Not=A?Brand\";v=\"8\", \"Chromium\";v=\"129\"",
-	"Sec-Ch-Ua-Full-Version-List": "\"Google Chrome\";v=\"129.0.6668.58\", \"Not=A?Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"129.0.6668.58\"",
+	"Sec-Ch-Ua-Full-Version-List": '"Chromium";v="134.0.6998.177", "Not:A-Brand";v="24.0.0.0", "Google Chrome";v="134.0.6998.177"',
 	"Sec-Ch-Ua-Mobile": "?0",
-	"Sec-Ch-Ua-Model": "\"\"",
-	"Sec-Ch-Ua-Platform": "\"Windows\"",
-	"Sec-Ch-Ua-Platform-version": "\"15.0.0\"",
+	"Sec-Ch-Ua-Model": '""',
+	"Sec-Ch-Ua-Platform": '"Windows"',
+	"Sec-Ch-Ua-Platform-Version": '"19.0.0"',
 	"Sec-Fetch-Dest": "empty",
 	"Sec-Fetch-Mode": "cors",
 	"Upgrade-Insecure-Requests": "1",
-	"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36"
+	"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36"
 })
 
 Object.assign(axios.defaults.headers.get, {
@@ -328,6 +328,7 @@ export default class Downloader {
 					Priority: "u=0, i",
 					"Sec-Fetch-Dest": "document",
 					"Sec-Fetch-Mode": "navigate",
+					"Sec-Fetch-Site": "same-origin",
 					"Sec-Fetch-User": "?1",
 					"X-Csrftoken": undefined,
 					"X-Ig-App-Id": undefined

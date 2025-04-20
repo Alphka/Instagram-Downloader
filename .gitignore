@@ -1,8 +1,46 @@
-.vscode/
-node_modules/
-output/
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# Testing
+/coverage
+
+# Production
+/output/
+/build/
+
+# Misc
+.DS_Store
+*.pem
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local ENV files
+.env
+.env*.local
+
+# Vercel
+.vercel/
+
+# Turborepo
+.turbo
+
+# TypeScript
+*.tsbuildinfo
+
+# IDE
+.idea
+
+package-lock.json
+yarn.lock
+config.json
+/test*.*
+
 tests/*
 !tests/index.test.js
-.env
-config.json
-test*.*
+
+.vscode/launch.json
