@@ -70,6 +70,7 @@ export default class Downloader {
 	/** @type {import("./typings/index.d.ts").Config} */ config
 	/** @type {Queue<ReturnType<typeof this.Download>>} */ queue
 	/** @type {string | undefined} */ fbToken
+	/** @type {boolean} */ flat_dirs
 
 	isEnvSet = false
 
@@ -99,6 +100,7 @@ export default class Downloader {
 
 		this.limit = limit
 		this.queue = new Queue(queue)
+		this.flat_dirs = false
 	}
 	SetConfig(){
 		if(!existsSync(configPath)){
@@ -189,10 +191,11 @@ export default class Downloader {
 
 		headers.Cookie = Object.entries(cookie).map(([key, value]) => `${key}=${value || ""}`).join("; ")
 	}
-	/** @param {Pick<import("./typings/index.d.ts").Options, "output" | "timeline" | "highlights" | "stories" | "hcover" | "debug" >} data */
-	async Init({ output, timeline, highlights, hcover, stories, debug }){
+	/** @param {Pick<import("./typings/index.d.ts").Options, "output" | "timeline" | "highlights" | "stories" | "hcover" | "debug" | "flat_dirs">} data */
+	async Init({ output, timeline, highlights, hcover, stories, debug, flat_dirs }){
 		Log("Initializing")
 		DEBUG = debug ? Log : (...args) => {}
+		this.flat_dirs = flat_dirs
 
 		if(!this.usernames.length) throw "There are no valid usernames"
 
@@ -493,7 +496,7 @@ export default class Downloader {
 				if(count > limit) throw new Error("Unexpected error")
 
 				Log(`Downloading highlight: '${title}' (${id.substring(id.indexOf(":") + 1)})`)
-				let target_dir = join(folder, "highlights", filenamify(title))
+				let target_dir = this.flat_dirs ? folder : join(folder, "highlights", filenamify(title))
 				if(items.length > 0 && !existsSync(target_dir)) await mkdir(target_dir, { recursive: true })
 
 				for(const item of items){
@@ -551,7 +554,7 @@ export default class Downloader {
 
 		const { items: stories } = results
 
-		const target_dir = join(folder, "stories")
+		const target_dir = this.flat_dirs ? folder : join(folder, "stories")
 		if(stories.length){
 			if(!existsSync(target_dir)) await mkdir(target_dir, { recursive: true })
 			Log("Downloading stories")
@@ -604,7 +607,7 @@ export default class Downloader {
 					first = false
 				}
 
-				const target_dir = join(folder, "timeline")
+				const target_dir = this.flat_dirs ? folder : join(folder, "timeline")
 				await mkdir(target_dir, { recursive: true })
 
 				const data = { count, limit }

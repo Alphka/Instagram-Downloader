@@ -16,4 +16,5 @@ export interface Options {
 	highlights: boolean
 	hcover: boolean
 	debug: boolean
+	flat_dirs: boolean
 }

@@ -60,6 +60,11 @@ const config = {
 			option: "debug",
 			alternative: "d",
 			description: "Verbose output"
+		},
+		{
+			option: "flat-dir",
+			alternative: "fd",
+			description: "Download all items of a user to the same directory"
 		}
 	]
 }
