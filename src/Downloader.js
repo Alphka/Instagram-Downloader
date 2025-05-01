@@ -700,6 +700,12 @@ export default class Downloader {
 
 		const { name, ext } = parse(filename)
 
+		const path = join(folder, filename)
+		if (existsSync(path)) {
+			// Skip re-download of already downloaded content
+			// TODO: need to check for all files with the same name but different extension due to the use of sharp for correct extension
+			return path
+		}
 		if(/^image\/.+$/.test(mime.getType(ext))) return this.queue.add(async () => {
 			Object.assign(config, { responseType: "arraybuffer" })
 
