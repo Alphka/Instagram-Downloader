@@ -55,6 +55,11 @@ const config = {
 			option: "no-hcover",
 			alternative: "nhc",
 			description: "Disable highlights' cover download"
+		},
+		{
+			option: "debug",
+			alternative: "d",
+			description: "Verbose output"
 		}
 	]
 }

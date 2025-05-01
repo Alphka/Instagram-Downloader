@@ -57,6 +57,7 @@ const fbTokenRegexArray = [
 	/"token":"([\w-]+:\d+:\d+)"/
 ]
 
+let DEBUG = (...args) => {}
 export default class Downloader {
 	/** @type {import("./typings/api.js").APIHeaders} */ headers = {
 		Accept: "*/*",
@@ -188,9 +189,10 @@ export default class Downloader {
 
 		headers.Cookie = Object.entries(cookie).map(([key, value]) => `${key}=${value || ""}`).join("; ")
 	}
-	/** @param {Pick<import("./typings/index.d.ts").Options, "output" | "timeline" | "highlights" | "stories" | "hcover">} data */
-	async Init({ output, timeline, highlights, hcover, stories }){
+	/** @param {Pick<import("./typings/index.d.ts").Options, "output" | "timeline" | "highlights" | "stories" | "hcover" | "debug" >} data */
+	async Init({ output, timeline, highlights, hcover, stories, debug }){
 		Log("Initializing")
+		DEBUG = debug ? Log : (...args) => {}
 
 		if(!this.usernames.length) throw "There are no valid usernames"
 
@@ -224,7 +226,7 @@ export default class Downloader {
 
 		for(const username of this.usernames){
 			const userId = await this.GetUserId(username)
-
+			DEBUG(`User '${username}' has ID: ${userId}`)
 			try{
 				if(!userId) throw new Error(`Failed to get user ID: ${username}`)
 
@@ -273,6 +275,7 @@ export default class Downloader {
 			maxRedirects: 0
 		})
 
+		DEBUG("CheckLogin:", typeof response?.data, response?.data)
 		if(typeof response?.data === "object" && "status" in response.data){
 			const { status, message } = response.data
 			if(status === "ok") return
@@ -433,6 +436,7 @@ export default class Downloader {
 			throw new Error(`Error downloading highlights ${error ? `(${error.severity}): ${error.message}` : ""}`)
 		}
 
+		DEBUG("GetHighlightsContents:", JSON.stringify(feed, undefined, 2))
 		return feed.edges.map(({ node }) => node)
 	}
 	/**
@@ -452,6 +456,7 @@ export default class Downloader {
 
 		if(typeof response?.data === "object"){
 			const { reels, reels_media } = response.data
+			DEBUG("GetStories:", JSON.stringify(response.data, undefined, 2))
 			return reels_media.length ? reels[userId] : null
 		}
 
