@@ -273,8 +273,9 @@ export default class Downloader {
 		})
 
 		if(typeof response?.data === "object" && "status" in response.data){
-			const { fbAccount, status } = response.data
-			if(status === "ok" && Boolean(fbAccount)) return
+			const { status, message } = response.data
+			if(status === "ok") return
+			if (message) throw new Error(`User is not logged in: ${message}`)
 		}
 
 		throw new Error("User is not logged in")
