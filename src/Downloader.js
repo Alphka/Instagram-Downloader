@@ -205,8 +205,11 @@ export default class Downloader {
 
 		do{
 			try{
-				// await this.CheckLogin()
-				// Log("Logged in")
+				if (highlights) {
+					// Highlights require a valid session
+					await this.CheckLogin()
+					Log("Logged in")
+				}
 				break
 			}catch{
 				Log(new Error("You are not logged in. Type your data for authentication."))
