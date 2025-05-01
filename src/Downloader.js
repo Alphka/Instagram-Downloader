@@ -13,6 +13,7 @@ import Queue from "./Queue.js"
 import axios from "axios"
 import sharp from "sharp"
 import mime from "mime"
+import filenamify from 'filenamify';
 import Log from "./helpers/Log.js"
 
 const __filename = fileURLToPath(import.meta.url)
@@ -472,8 +473,6 @@ export default class Downloader {
 		let hasHighlights = Boolean(highlights.length)
 		let count = 0
 
-		if(hasHighlights && !existsSync(folder)) await mkdir(folder, { recursive: true })
-
 		while(highlights.length && limit > count){
 			const ids = highlights.splice(0, 10).map(({ id }) => id)
 			const highlightsContents = await this.GetHighlightsContents(ids, username)
@@ -485,10 +484,12 @@ export default class Downloader {
 				break
 			}
 
-			for(const { id, items } of highlightsContents){
+			for(const { id, items, title } of highlightsContents){
 				if(count > limit) throw new Error("Unexpected error")
 
-				Log(`Downloading highlight: ${id.substring(id.indexOf(":") + 1)}`)
+				Log(`Downloading highlight: '${title}' (${id.substring(id.indexOf(":") + 1)})`)
+				let target_dir = join(folder, "highlights", filenamify(title))
+				if(items.length > 0 && !existsSync(target_dir)) await mkdir(target_dir, { recursive: true })
 
 				for(const item of items){
 					const { url } = GetCorrectContent(item)[0]
@@ -504,7 +505,7 @@ export default class Downloader {
 				}
 
 				const data = { count, limit }
-				const { urls, limited } = await this.DownloadItems(items, folder, data, username)
+				const { urls, limited } = await this.DownloadItems(items, target_dir, data, username)
 
 				count = data.count
 
@@ -517,7 +518,7 @@ export default class Downloader {
 						count++
 
 						try{
-							await this.Download(coverUrl, folder, new Date)
+							await this.Download(coverUrl, target_dir, new Date)
 						}catch(error){
 							Log(error)
 						}
@@ -545,8 +546,9 @@ export default class Downloader {
 
 		const { items: stories } = results
 
+		const target_dir = join(folder, "stories")
 		if(stories.length){
-			if(!existsSync(folder)) await mkdir(folder, { recursive: true })
+			if(!existsSync(target_dir)) await mkdir(target_dir, { recursive: true })
 			Log("Downloading stories")
 		}
 
@@ -555,7 +557,7 @@ export default class Downloader {
 		while(stories.length && limit > count){
 			const items = stories.splice(0, 10)
 			const data = { count, limit }
-			const { limited } = await this.DownloadItems(items, folder, data, username)
+			const { limited } = await this.DownloadItems(items, target_dir, data, username)
 
 			count = data.count
 
@@ -597,10 +599,11 @@ export default class Downloader {
 					first = false
 				}
 
-				await mkdir(folder, { recursive: true })
+				const target_dir = join(folder, "timeline")
+				await mkdir(target_dir, { recursive: true })
 
 				const data = { count, limit }
-				const { limited } = await this.DownloadItems(items, folder, data, username)
+				const { limited } = await this.DownloadItems(items, target_dir, data, username)
 
 				if(limited) break
 
