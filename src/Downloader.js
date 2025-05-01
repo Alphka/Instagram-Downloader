@@ -632,6 +632,7 @@ export default class Downloader {
 	async DownloadItems(items, folder, data, username){
 		/** @type {Map<string, Date>} */
 		const urls = new Map
+		const folders = new Map
 
 		const shouldLimit = data && typeof data.limit === "number"
 		let limited = false
@@ -644,8 +645,9 @@ export default class Downloader {
 		/**
 		 * @param {typeof items[number]} item
 		 * @param {Date} date
+		 * @param {string} folder
 		 */
-		function Carousel(item, date){
+		function Carousel(item, date, folder){
 			for(const media of item.carousel_media){
 				if(shouldLimit && data.count >= data.limit){
 					limited = true
@@ -654,6 +656,7 @@ export default class Downloader {
 
 				const { url } = GetCorrectContent(media)[0]
 				urls.set(url, date)
+				folders.set(url, folder)
 
 				data.count++
 			}
@@ -668,20 +671,23 @@ export default class Downloader {
 			const date = new Date(item.taken_at * 1000)
 
 			if(item.carousel_media_count){
-				Carousel(item, date)
+				const target_dir = this.flat_dirs ? folder : join(folder, "carousel", item.pk)
+				if(item.carousel_media.length > 0 && !existsSync(target_dir)) await mkdir(target_dir, { recursive: true })
+				Carousel(item, date, target_dir)
 				if(limited) break
 				continue
 			}
 
 			const { url } = GetCorrectContent(item)[0]
 			urls.set(url, date)
+			folders.set(url, folder)
 
 			data.count++
 		}
 
 		await Promise.all(Array.from(urls.entries()).map(async ([url, date]) => {
 			try{
-				await this.Download(url, folder, date, undefined, {
+				await this.Download(url, folders.get(url) || folder, date, undefined, {
 					headers: { Referer: username ? this.GetUserProfileLink(username) : BASE_URL + "/" }
 				})
 			}catch(error){
