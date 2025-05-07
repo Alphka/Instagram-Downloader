@@ -15,4 +15,6 @@ export interface Options {
 	timeline: boolean
 	highlights: boolean
 	hcover: boolean
+	debug: boolean
+	flat_dirs: boolean
 }
