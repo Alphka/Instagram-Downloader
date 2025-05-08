@@ -1118,7 +1118,7 @@ export interface FacebookAccountAPIResponse {
 		is_sso_enabled: boolean
 	}
 	status: APIStatus
-	message: string
+	message?: string
 }
 
 export type ReplyTypes = "story_selfie_reply" | "story_remix_reply"

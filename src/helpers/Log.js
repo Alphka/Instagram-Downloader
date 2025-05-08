@@ -1,7 +1,10 @@
+/* eslint-disable no-console */
+
 import chalk from "chalk"
 
 const isTesting = process.env.npm_command === "test" || process.env.npm_lifecycle_event === "test"
 
+/** @param {any[]} args */
 export default function Log(...args){
 	if(isTesting) return
 

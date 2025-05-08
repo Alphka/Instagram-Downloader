@@ -32,6 +32,8 @@ Options:
   -nt, --no-timeline    Disable timeline download
   -nh, --no-highlights  Disable highlights download
   -nhc, --no-hcover     Disable highlights' cover download
+  -d, --debug           Verbose output
+  -fd, --flat-dir       Download all contents of the user in the same directory
   -h, --help            Display help
 ```
 

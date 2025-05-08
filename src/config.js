@@ -64,7 +64,7 @@ const config = {
 		{
 			option: "flat-dir",
 			alternative: "fd",
-			description: "Download all items of a user to the same directory"
+			description: "Download all contents of the user in the same directory"
 		}
 	]
 }

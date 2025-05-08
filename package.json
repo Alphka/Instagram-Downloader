@@ -8,7 +8,8 @@
 		"start": "node --no-warnings .",
 		"test": "node --no-warnings --test tests/index.test.js",
 		"test:watch": "node --no-warnings --test --watch tests/index.test.js",
-		"lint": "tsc -p jsconfig.json"
+		"lint": "eslint .",
+		"lint:tsc": "tsc -p jsconfig.json"
 	},
 	"keywords": [
 		"instagram",
@@ -29,8 +30,15 @@
 		"sharp": "^0.34.1"
 	},
 	"devDependencies": {
+		"@eslint/eslintrc": "^3.3.1",
+		"@eslint/js": "^9.26.0",
+		"@stylistic/eslint-plugin": "^4.2.0",
 		"@types/mime": "^3.0.4",
 		"@types/node": "^22.14.1",
+		"eslint-plugin-n": "^17.17.0",
+		"eslint-plugin-regexp": "^2.7.0",
+		"eslint-plugin-unused-imports": "^4.1.4",
+		"globals": "^16.1.0",
 		"typescript": "^5.8.3"
 	},
 	"pnpm": {

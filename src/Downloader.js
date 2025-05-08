@@ -7,13 +7,14 @@ import GetCorrectContent from "./helpers/GetCorrectContent.js"
 import ValidateUsername from "./helpers/ValidateUsername.js"
 import FindRegexArray from "./helpers/FindRegexArray.js"
 import GetURLFilename from "./helpers/GetURLFilename.js"
+import filenamify from "filenamify"
 import Question from "./helpers/Question.js"
 import dotenv from "dotenv"
+import Debug from "./helpers/Debug.js"
 import Queue from "./Queue.js"
 import axios from "axios"
 import sharp from "sharp"
 import mime from "mime"
-import filenamify from 'filenamify';
 import Log from "./helpers/Log.js"
 
 const __filename = fileURLToPath(import.meta.url)
@@ -45,11 +46,11 @@ Object.assign(axios.defaults.headers.get, {
 })
 
 const userIdRegexArray = [
-	/{"id":"(\d+)","profile_pic_url"/,
-	/{"query_id":"\d+","user_id":"(\d+)"/,
-	/{"content_type":"PROFILE","target_id":"(\d+)"}/,
+	/\{"id":"(\d+)","profile_pic_url"/,
+	/\{"query_id":"\d+","user_id":"(\d+)"/,
+	/\{"content_type":"PROFILE","target_id":"(\d+)"\}/,
 	/"profile_id":"(\d+)"/,
-	/profilePage_(\d+)/,
+	/profilePage_(\d+)/
 ]
 
 const fbTokenRegexArray = [
@@ -57,7 +58,6 @@ const fbTokenRegexArray = [
 	/"token":"([\w-]+:\d+:\d+)"/
 ]
 
-let DEBUG = (...args) => {}
 export default class Downloader {
 	/** @type {import("./typings/api.js").APIHeaders} */ headers = {
 		Accept: "*/*",
@@ -70,7 +70,8 @@ export default class Downloader {
 	/** @type {import("./typings/index.d.ts").Config} */ config
 	/** @type {Queue<ReturnType<typeof this.Download>>} */ queue
 	/** @type {string | undefined} */ fbToken
-	/** @type {boolean} */ flat_dirs
+	/** @type {boolean} */ debug
+	/** @type {boolean} */ flatDir
 
 	isEnvSet = false
 
@@ -100,7 +101,7 @@ export default class Downloader {
 
 		this.limit = limit
 		this.queue = new Queue(queue)
-		this.flat_dirs = false
+		this.flatDir = false
 	}
 	SetConfig(){
 		if(!existsSync(configPath)){
@@ -157,7 +158,9 @@ export default class Downloader {
 		const { config } = this
 		const envPath = join(root, ".env")
 
-		if(existsSync(envPath)) dotenv.config({ path: envPath })
+		if(existsSync(envPath)){
+			dotenv.config({ path: envPath })
+		}
 
 		const data = {
 			TOKEN: process.env.TOKEN || config.csrftoken,
@@ -172,6 +175,7 @@ export default class Downloader {
 		this.UpdateHeaders()
 
 		const envString = Object.entries(data).map(([key, value]) => {
+			// eslint-disable-next-line array-callback-return
 			if(!value) return
 			return `${key}=${value}`
 		}).filter(Boolean).join("\n") + "\n"
@@ -191,13 +195,16 @@ export default class Downloader {
 
 		headers.Cookie = Object.entries(cookie).map(([key, value]) => `${key}=${value || ""}`).join("; ")
 	}
-	/** @param {Pick<import("./typings/index.d.ts").Options, "output" | "timeline" | "highlights" | "stories" | "hcover" | "debug" | "flat_dirs">} data */
-	async Init({ output, timeline, highlights, hcover, stories, debug, flat_dirs }){
+	/** @param {Pick<import("./typings/index.d.ts").Options, "output" | "timeline" | "highlights" | "stories" | "hcover" | "debug" | "flatDir">} data */
+	async Init({ output, timeline, highlights, hcover, stories, debug, flatDir }){
 		Log("Initializing")
-		DEBUG = debug ? Log : (...args) => {}
-		this.flat_dirs = flat_dirs
 
-		if(!this.usernames.length) throw "There are no valid usernames"
+		this.debug = debug
+		this.flatDir = flatDir
+
+		if(!this.usernames.length){
+			throw "There are no valid usernames"
+		}
 
 		this.SetConfig()
 
@@ -205,11 +212,12 @@ export default class Downloader {
 
 		do{
 			try{
-				if (highlights) {
-					// Highlights require a valid session
+				if(stories && highlights){
+					// Stories and highlights require a valid session
 					await this.CheckLogin()
 					Log("Logged in")
 				}
+
 				break
 			}catch{
 				Log(new Error("You are not logged in. Type your data for authentication."))
@@ -232,25 +240,29 @@ export default class Downloader {
 
 		for(const username of this.usernames){
 			const userId = await this.GetUserId(username)
-			DEBUG(`User '${username}' has ID: ${userId}`)
+
+			if(this.debug) Debug(`User '${username}' has ID: ${userId}`)
+
 			try{
 				if(!userId) throw new Error(`Failed to get user ID: ${username}`)
 
 				const { is_private, friendship_status: { following } } = await this.GetUser(userId, username)
 					// Make the GetUser call non fatal
-					.catch(err => {
-						DEBUG("GetUser error:", err)
+					.catch(error => {
+						if(this.debug) Debug("GetUser error:", error)
 						return { is_private: false, friendship_status: { following: false } }
 					})
 
-				if(is_private && !following) throw new Error(`You don't have access to a private account: ${username}`)
+				if(is_private && !following){
+					throw new Error(`You don't have access to a private account: ${username}`)
+				}
 			}catch(error){
 				Log(error)
 				errored++
 				continue
 			}
 
-			Log(`Downloading from user: ${username}, id: ${userId}`)
+			Log(`Downloading contents from user: ${username}, id: ${userId}`)
 
 			const folder = join(output, username)
 
@@ -286,11 +298,12 @@ export default class Downloader {
 			maxRedirects: 0
 		})
 
-		DEBUG("CheckLogin:", typeof response?.data, response?.data)
+		if(this.debug) Debug("CheckLogin:", typeof response?.data, response?.data)
+
 		if(typeof response?.data === "object" && "status" in response.data){
 			const { status, message } = response.data
 			if(status === "ok") return
-			if (message) throw new Error(`User is not logged in: ${message}`)
+			if(message) throw new Error(`User is not logged in: ${message}`)
 		}
 
 		throw new Error("User is not logged in")
@@ -447,7 +460,8 @@ export default class Downloader {
 			throw new Error(`Error downloading highlights ${error ? `(${error.severity}): ${error.message}` : ""}`)
 		}
 
-		DEBUG("GetHighlightsContents:", JSON.stringify(feed, undefined, 2))
+		if(this.debug) Debug("GetHighlightsContents:", JSON.stringify(feed, undefined, 2))
+
 		return feed.edges.map(({ node }) => node)
 	}
 	/**
@@ -467,7 +481,9 @@ export default class Downloader {
 
 		if(typeof response?.data === "object"){
 			const { reels, reels_media } = response.data
-			DEBUG("GetStories:", JSON.stringify(response.data, undefined, 2))
+
+			if(this.debug) Debug("GetStories:", JSON.stringify(response.data, undefined, 2))
+
 			return reels_media.length ? reels[userId] : null
 		}
 
@@ -504,8 +520,12 @@ export default class Downloader {
 				if(count > limit) throw new Error("Unexpected error")
 
 				Log(`Downloading highlight: '${title}' (${id.substring(id.indexOf(":") + 1)})`)
-				let target_dir = this.flat_dirs ? folder : join(folder, "highlights", filenamify(title))
-				if(items.length > 0 && !existsSync(target_dir)) await mkdir(target_dir, { recursive: true })
+
+				const target_dir = this.flatDir ? folder : join(folder, "highlights", filenamify(title))
+
+				if(items.length){
+					await mkdir(target_dir, { recursive: true })
+				}
 
 				for(const item of items){
 					const { url } = GetCorrectContent(item)[0]
@@ -562,9 +582,10 @@ export default class Downloader {
 
 		const { items: stories } = results
 
-		const target_dir = this.flat_dirs ? folder : join(folder, "stories")
+		const target_dir = this.flatDir ? folder : join(folder, "stories")
+
 		if(stories.length){
-			if(!existsSync(target_dir)) await mkdir(target_dir, { recursive: true })
+			await mkdir(target_dir, { recursive: true })
 			Log("Downloading stories")
 		}
 
@@ -615,7 +636,8 @@ export default class Downloader {
 					first = false
 				}
 
-				const target_dir = this.flat_dirs ? folder : join(folder, "timeline")
+				const target_dir = this.flatDir ? folder : join(folder, "timeline")
+
 				await mkdir(target_dir, { recursive: true })
 
 				const data = { count, limit }
@@ -679,14 +701,21 @@ export default class Downloader {
 			const date = new Date(item.taken_at * 1000)
 
 			if(item.carousel_media_count){
-				const target_dir = this.flat_dirs ? folder : join(folder, "carousel", item.pk)
-				if(item.carousel_media.length > 0 && !existsSync(target_dir)) await mkdir(target_dir, { recursive: true })
+				const target_dir = this.flatDir ? folder : join(folder, "carousel", item.pk)
+
+				if(item.carousel_media.length){
+					await mkdir(target_dir, { recursive: true })
+				}
+
 				Carousel(item, date, target_dir)
+
 				if(limited) break
+
 				continue
 			}
 
 			const { url } = GetCorrectContent(item)[0]
+
 			urls.set(url, date)
 			folders.set(url, folder)
 
@@ -723,11 +752,13 @@ export default class Downloader {
 		const { name, ext } = parse(filename)
 
 		const path = join(folder, filename)
-		if (existsSync(path)) {
+
+		if(existsSync(path)){
 			// Skip re-download of already downloaded content
 			// TODO: need to check for all files with the same name but different extension due to the use of sharp for correct extension
 			return path
 		}
+
 		if(/^image\/.+$/.test(mime.getType(ext))) return this.queue.add(async () => {
 			Object.assign(config, { responseType: "arraybuffer" })
 

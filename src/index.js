@@ -56,33 +56,33 @@ const command = program
 		 * @param {import("commander").Command} command
 		 */
 		async (_arg, options, command) => {
-		try{
-			if(!command.args.length) throw "No usernames provided"
-			if(!options.highlights) options.hcover = false
+			try{
+				if(!command.args.length) throw "No usernames provided"
+				if(!options.highlights) options.hcover = false
 
-			if(
-				!options.highlights &&
-				!options.timeline &&
-				!options.stories
-			) throw "Allow download of at least one type of content"
+				if(
+					!options.highlights &&
+					!options.timeline &&
+					!options.stories
+				) throw "Allow download of at least one type of content"
 
-			const output = GetOutputDirectory(options.output, options.force)
+				const output = GetOutputDirectory(options.output, options.force)
 
-			const downloader = new Downloader(
-				command.args,
-				isNumber(options.queue) ? Number(options.queue) : 12,
-				isNumber(options.limit) ? Number(options.limit) : undefined
-			)
+				const downloader = new Downloader(
+					command.args,
+					isNumber(options.queue) ? Number(options.queue) : 12,
+					isNumber(options.limit) ? Number(options.limit) : undefined
+				)
 
-			await downloader.Init({
-				...options,
-				output
-			})
-		}catch(error){
-			Log(error instanceof Error ? error : new Error(String(error)))
-			process.exitCode = 1
-		}
-	})
+				await downloader.Init({
+					...options,
+					output
+				})
+			}catch(error){
+				Log(error instanceof Error ? error : new Error(String(error)))
+				process.exitCode = 1
+			}
+		})
 
 config.options.forEach(({ option, alternative, description, defaultValue, syntax }) => {
 	let flags = ""

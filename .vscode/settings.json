@@ -1,4 +1,98 @@
 {
+	"javascript.format.insertSpaceAfterConstructor": false,
+	"javascript.format.insertSpaceAfterCommaDelimiter": true,
+	"javascript.format.insertSpaceAfterSemicolonInForStatements": true,
+	"javascript.format.insertSpaceAfterKeywordsInControlFlowStatements": false,
+	"javascript.format.insertSpaceAfterOpeningAndBeforeClosingEmptyBraces": false,
+	"javascript.format.insertSpaceAfterFunctionKeywordForAnonymousFunctions": false,
+	"javascript.format.insertSpaceAfterOpeningAndBeforeClosingNonemptyBraces": true,
+	"javascript.format.insertSpaceAfterOpeningAndBeforeClosingNonemptyBrackets": false,
+	"javascript.format.insertSpaceAfterOpeningAndBeforeClosingNonemptyParenthesis": false,
+	"javascript.format.insertSpaceAfterOpeningAndBeforeClosingJsxExpressionBraces": false,
+	"javascript.format.insertSpaceAfterOpeningAndBeforeClosingTemplateStringBraces": false,
+	"javascript.format.insertSpaceBeforeAndAfterBinaryOperators": true,
+	"javascript.format.insertSpaceBeforeFunctionParenthesis": false,
+	"javascript.format.placeOpenBraceOnNewLineForFunctions": false,
+	"javascript.format.placeOpenBraceOnNewLineForControlBlocks": false,
+	"javascript.format.semicolons": "remove",
+	"javascript.preferences.importModuleSpecifier": "shortest",
+	"javascript.preferences.importModuleSpecifierEnding": "minimal",
+	"javascript.preferences.quoteStyle": "double",
+
+	"typescript.enablePromptUseWorkspaceTsdk": false,
+	"typescript.format.indentSwitchCase": true,
+	"typescript.format.insertSpaceAfterConstructor": false,
+	"typescript.format.insertSpaceAfterTypeAssertion": true,
+	"typescript.format.insertSpaceAfterCommaDelimiter": true,
+	"typescript.format.insertSpaceAfterSemicolonInForStatements": true,
+	"typescript.format.insertSpaceAfterKeywordsInControlFlowStatements": false,
+	"typescript.format.insertSpaceAfterOpeningAndBeforeClosingEmptyBraces": false,
+	"typescript.format.insertSpaceAfterFunctionKeywordForAnonymousFunctions": false,
+	"typescript.format.insertSpaceAfterOpeningAndBeforeClosingNonemptyBraces": true,
+	"typescript.format.insertSpaceAfterOpeningAndBeforeClosingNonemptyBrackets": false,
+	"typescript.format.insertSpaceAfterOpeningAndBeforeClosingNonemptyParenthesis": false,
+	"typescript.format.insertSpaceAfterOpeningAndBeforeClosingJsxExpressionBraces": false,
+	"typescript.format.insertSpaceAfterOpeningAndBeforeClosingTemplateStringBraces": false,
+	"typescript.format.insertSpaceBeforeAndAfterBinaryOperators": true,
+	"typescript.format.insertSpaceBeforeFunctionParenthesis": false,
+	"typescript.format.placeOpenBraceOnNewLineForFunctions": false,
+	"typescript.format.placeOpenBraceOnNewLineForControlBlocks": false,
+	"typescript.format.semicolons": "remove",
+	"typescript.preferences.importModuleSpecifier": "shortest",
+	"typescript.preferences.importModuleSpecifierEnding": "minimal",
+	"typescript.preferences.preferTypeOnlyAutoImports": true,
+	"typescript.preferences.quoteStyle": "double",
+	"typescript.reportStyleChecksAsWarnings": true,
+
+	"eslint.enable": true,
+	"eslint.format.enable": true,
+
+	"editor.formatOnPaste": false,
+	"editor.formatOnSave": false,
+	"editor.formatOnType": false,
+	"editor.insertSpaces": false,
+	"editor.tabSize": 4,
+
+	"[javascript]": {
+		"editor.defaultFormatter": "dbaeumer.vscode-eslint"
+	},
+
+	"[typescript]": {
+		"editor.defaultFormatter": "dbaeumer.vscode-eslint"
+	},
+
+	"files.eol": "\n",
+	"files.insertFinalNewline": true,
+	"files.trimTrailingWhitespace": true,
+	"files.trimFinalNewlines": true,
+
+	"[markdown]": {
+		"diffEditor.ignoreTrimWhitespace": false,
+		"editor.insertSpaces": true,
+		"editor.tabSize": 2,
+		"editor.wordWrap": "on",
+		"editor.unicodeHighlight.ambiguousCharacters": false,
+		"editor.unicodeHighlight.invisibleCharacters": false,
+		"editor.quickSuggestions": {
+			"comments": "on",
+			"strings": "on",
+			"other": "on"
+		},
+		"files.trimTrailingWhitespace": false
+	},
+
+	"[yaml]": {
+		"editor.insertSpaces": true,
+		"editor.tabSize": 2,
+		"editor.autoIndent": "advanced",
+		"diffEditor.ignoreTrimWhitespace": false,
+		"files.trimTrailingWhitespace": false
+	},
+
+	"npm-intellisense.importES6": true,
+	"npm-intellisense.importQuotes": "\"",
+	"npm-intellisense.importLinebreak": "\n",
+
 	"json.schemas": [
 		{
 			"fileMatch": [

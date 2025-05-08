@@ -15,10 +15,11 @@ export default class Queue {
 
 		if(size < this.limit){
 			return this.HandleItem(item)
-		}else{
-			this._queue.add(item)
-			return this.AwaitItem(item)
 		}
+
+		this._queue.add(item)
+
+		return this.AwaitItem(item)
 	}
 
 	/** @param {() => T} item */
@@ -44,7 +45,10 @@ export default class Queue {
 	 * @returns {Promise<T>}
 	 */
 	async AwaitItem(item){
-		let resolve, reject
+		/** @type {(value: any) => void} */
+		let resolve
+		/** @type {(reason?: any) => void} */
+		let reject
 
 		const promise = new Promise((res, rej) => {
 			resolve = res
