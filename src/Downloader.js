@@ -8,7 +8,6 @@ import ValidateUsername from "./helpers/ValidateUsername.js"
 import FindRegexArray from "./helpers/FindRegexArray.js"
 import GetURLFilename from "./helpers/GetURLFilename.js"
 import filenamify from "filenamify"
-import Question from "./helpers/Question.js"
 import dotenv from "dotenv"
 import Debug from "./helpers/Debug.js"
 import Queue from "./Queue.js"
@@ -210,13 +209,17 @@ export default class Downloader {
 
 		await this.CheckServerConfig()
 
+		// The function CheckLogin is problematic: Even after setting your credentials,
+		// it says the user is not logged in
+
+		/*
 		do{
 			try{
-				if(stories && highlights){
-					// Stories and highlights require a valid session
-					await this.CheckLogin()
-					Log("Logged in")
-				}
+				// TODO: Change this when anonymous downloads are implemented
+				// Only stories and highlights should require authentication
+
+				// await this.CheckLogin()
+				// Log("Logged in")
 
 				break
 			}catch{
@@ -234,7 +237,7 @@ export default class Downloader {
 
 				this.WriteConfig(true)
 			}
-		}while(true)
+		}while(true) */
 
 		let errored = 0
 
@@ -407,7 +410,7 @@ export default class Downloader {
 				!sessionid ||
 				sessionid === '""' ||
 				!vary.includes("Cookie")
-			) throw "Login session expired"
+			) throw "GetHighlights: Unauthenticated or login session expired"
 
 			const { data: { highlights } } = response.data
 
@@ -484,7 +487,7 @@ export default class Downloader {
 
 			if(this.debug) Debug("GetStories:", JSON.stringify(response.data, undefined, 2))
 
-			return reels_media.length ? reels[userId] : null
+			return reels_media?.length ? reels[userId] : null
 		}
 
 		return null

@@ -1282,7 +1282,7 @@ export interface StoriesAPIResponse {
 	reels: {
 		[storyId: StoryId]: ReelMedia<StoryId>
 	}
-	reels_media: ReelMedia<StoryId>[]
+	reels_media?: ReelMedia<StoryId>[]
 	status: APIStatus
 }
 
