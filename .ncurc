@@ -1,6 +1,7 @@
 {
 	"reject": [
 		"@types/mime",
+		"commander",
 		"mime"
 	]
 }
