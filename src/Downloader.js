@@ -8,6 +8,7 @@ import ValidateUsername from "./helpers/ValidateUsername.js"
 import FindRegexArray from "./helpers/FindRegexArray.js"
 import GetURLFilename from "./helpers/GetURLFilename.js"
 import filenamify from "filenamify"
+import isNumber from "./helpers/isNumber.js"
 import dotenv from "dotenv"
 import Debug from "./helpers/Debug.js"
 import Queue from "./Queue.js"
@@ -194,12 +195,14 @@ export default class Downloader {
 
 		headers.Cookie = Object.entries(cookie).map(([key, value]) => `${key}=${value || ""}`).join("; ")
 	}
-	/** @param {Pick<import("./typings/index.d.ts").Options, "output" | "timeline" | "highlights" | "stories" | "hcover" | "debug" | "flatDir">} data */
-	async Init({ output, timeline, highlights, hcover, stories, debug, flatDir }){
+	/** @param {Pick<import("./typings/index.d.ts").Options, "output" | "timeline" | "highlights" | "limit" | "stories" | "hcover" | "debug" | "flatDir">} data */
+	async Init({ output, timeline, highlights, limit,  hcover, stories, debug, flatDir }){
 		Log("Initializing")
 
 		this.debug = debug
 		this.flatDir = flatDir
+
+		if(isNumber(limit)) this.limit = Number(limit)
 
 		if(!this.usernames.length){
 			throw "There are no valid usernames"
@@ -270,7 +273,7 @@ export default class Downloader {
 			const folder = join(output, username)
 
 			const results = await Promise.allSettled([
-				timeline && this.DownloadTimeline(username, folder),
+				timeline && this.DownloadTimeline(username, folder, this.limit),
 				highlights && this.DownloadHighlights(userId, folder, hcover, this.limit, username),
 				stories && this.DownloadStories(userId, folder, this.limit, username)
 			])
@@ -585,12 +588,13 @@ export default class Downloader {
 
 		const { items: stories } = results
 
+		if(!stories.length) return
+
+		Log("Downloading stories")
+
 		const target_dir = this.flatDir ? folder : join(folder, "stories")
 
-		if(stories.length){
-			await mkdir(target_dir, { recursive: true })
-			Log("Downloading stories")
-		}
+		await mkdir(target_dir, { recursive: true })
 
 		let count = 0
 
@@ -646,11 +650,12 @@ export default class Downloader {
 				const data = { count, limit }
 				const { limited } = await this.DownloadItems(items, target_dir, data, username)
 
+				count = data.count
+
 				if(limited) break
 
 				hasMore = more_available
 				lastId = next_max_id
-				count = data.count
 			}else Log(new Error("Failed to get timeline, lastId: " + (lastId || null)))
 		}
 
