@@ -7,14 +7,15 @@ export interface Config {
 }
 
 export interface Options {
-	output?: string
-	force: boolean
-	queue: 12 | string
-	limit?: string
-	stories: boolean
-	timeline: boolean
 	highlights: boolean
+	withThumbs: boolean
+	timeline: boolean
+	flatDir: boolean
+	stories: boolean
 	hcover: boolean
 	debug: boolean
-	flatDir: boolean
+	force: boolean
+	queue: 12 | string
+	output?: string
+	limit?: string
 }

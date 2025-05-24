@@ -34,6 +34,7 @@ Options:
   -nhc, --no-hcover     Disable highlights' cover download
   -d, --debug           Verbose output
   -fd, --flat-dir       Download all contents of the user in the same directory
+  -wt, --with-thumbs    Download thumbnails of videos
   -h, --help            Display help
 ```
 

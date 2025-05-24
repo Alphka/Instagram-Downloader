@@ -105,7 +105,22 @@ export interface FeedItem {
 	image_versions2: {
 		candidates: ImageVersion[]
 		additional_candidates?: AdditionalCandidates<ImageVersion>
-		smart_thumbnail_enabled: boolean
+		scrubber_spritesheet_info_candidates: {
+			default: {
+				file_size_kb: number
+				max_thumbnails_per_sprite: number
+				rendered_width: number
+				sprite_height: number
+				sprite_urls: string[]
+				sprite_width: number
+				thumbnail_duration: number
+				thumbnail_height: number
+				thumbnail_width: number
+				thumbnails_per_row: number
+				total_thumbnail_num_per_sprite: number
+				video_length: number
+			}
+		}
 	}
 	video_subtitles_confidence: number
 	caption: Caption | null
@@ -252,7 +267,7 @@ export interface FeedItem {
 		profile_pic_id: string
 		profile_pic_url: string
 	}[]
-	coauthor_producer_can_see_organic_insights: any
+	coauthor_producer_can_see_organic_insights?: boolean
 	location?: {
 		pk: string
 		short_name: string
@@ -884,6 +899,7 @@ export interface QueryTimelineAPIResponse {
 													width: number
 													height: number
 													url: string
+													scans_profile?: null
 												}[]
 											}
 											original_width: number

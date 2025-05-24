@@ -38,11 +38,6 @@ const eslintConfig = [
 			"tests/*/*.js",
 			"test*.js"
 		],
-		settings: {
-			next: {
-				rootDir: "."
-			}
-		},
 		rules: {
 			"array-bracket-spacing": ["error", "never"],
 			"array-callback-return": "error",

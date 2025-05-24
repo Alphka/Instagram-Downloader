@@ -72,6 +72,7 @@ export default class Downloader {
 	/** @type {string | undefined} */ fbToken
 	/** @type {boolean} */ debug
 	/** @type {boolean} */ flatDir
+	/** @type {boolean} */ withThumbs
 
 	isEnvSet = false
 
@@ -195,12 +196,35 @@ export default class Downloader {
 
 		headers.Cookie = Object.entries(cookie).map(([key, value]) => `${key}=${value || ""}`).join("; ")
 	}
-	/** @param {Pick<import("./typings/index.d.ts").Options, "output" | "timeline" | "highlights" | "limit" | "stories" | "hcover" | "debug" | "flatDir">} data */
-	async Init({ output, timeline, highlights, limit,  hcover, stories, debug, flatDir }){
+	/**
+	 * @param {Pick<import("./typings/index.d.ts").Options,
+	 * 	| "highlights"
+	 * 	| "withThumbs"
+	 * 	| "timeline"
+	 * 	| "stories"
+	 * 	| "flatDir"
+	 * 	| "hcover"
+	 * 	| "output"
+	 * 	| "debug"
+	 * 	| "limit"
+	 * >} data
+	 */
+	async Init({
+		highlights,
+		withThumbs,
+		timeline,
+		stories,
+		flatDir,
+		hcover,
+		output,
+		debug,
+		limit
+	}){
 		Log("Initializing")
 
 		this.debug = debug
 		this.flatDir = flatDir
+		this.withThumbs = withThumbs
 
 		if(isNumber(limit)) this.limit = Number(limit)
 
@@ -668,6 +692,8 @@ export default class Downloader {
 	 * @param {string} [username]
 	 */
 	async DownloadItems(items, folder, data, username){
+		const { withThumbs } = this
+
 		/** @type {Map<string, Date>} */
 		const urls = new Map
 		const folders = new Map
@@ -678,6 +704,29 @@ export default class Downloader {
 		if(shouldLimit && !data.limit) return {
 			urls: /** @type {Set<string>} */ (new Set),
 			limited: true
+		}
+
+		/**
+		 * @param {Pick<typeof items[number], "video_versions" | "image_versions2">} item
+		 * @param {Date} date
+		 * @param {string} folder
+		 */
+		function QueueItemContentDownload(item, date, folder){
+			if(withThumbs){
+				for(const url of [item.video_versions?.[0].url, item.image_versions2.candidates[0].url].filter(Boolean)){
+					urls.set(url, date)
+					folders.set(url, folder)
+
+					data.count++
+				}
+			}else{
+				const { url } = GetCorrectContent(item)[0]
+
+				urls.set(url, date)
+				folders.set(url, folder)
+
+				data.count++
+			}
 		}
 
 		/**
@@ -692,11 +741,7 @@ export default class Downloader {
 					break
 				}
 
-				const { url } = GetCorrectContent(media)[0]
-				urls.set(url, date)
-				folders.set(url, folder)
-
-				data.count++
+				QueueItemContentDownload(media, date, folder)
 			}
 		}
 
@@ -722,12 +767,7 @@ export default class Downloader {
 				continue
 			}
 
-			const { url } = GetCorrectContent(item)[0]
-
-			urls.set(url, date)
-			folders.set(url, folder)
-
-			data.count++
+			QueueItemContentDownload(item, date, folder)
 		}
 
 		await Promise.all(Array.from(urls.entries()).map(async ([url, date]) => {

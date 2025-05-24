@@ -65,6 +65,11 @@ const config = {
 			option: "flat-dir",
 			alternative: "fd",
 			description: "Download all contents of the user in the same directory"
+		},
+		{
+			option: "with-thumbs",
+			alternative: "wt",
+			description: "Download thumbnails of videos"
 		}
 	]
 }
