@@ -1,4 +1,4 @@
-#!/usr/bin/env node --no-warnings
+#!/usr/bin/env node
 
 import { dirname, isAbsolute, join, relative, resolve } from "path"
 import { existsSync, mkdirSync, readFileSync } from "fs"
