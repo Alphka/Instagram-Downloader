@@ -1,4 +1,19 @@
 {
+	"cSpell.enabled": true,
+	"cSpell.language": "en",
+	"cSpell.words": [
+		"apng",
+		"csrftoken",
+		"dtsg",
+		"filenamify",
+		"hcover",
+		"igweb",
+		"insta",
+		"instadl",
+		"KHTML",
+		"Souza"
+	],
+
 	"javascript.format.insertSpaceAfterConstructor": false,
 	"javascript.format.insertSpaceAfterCommaDelimiter": true,
 	"javascript.format.insertSpaceAfterSemicolonInForStatements": true,

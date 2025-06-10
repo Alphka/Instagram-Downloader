@@ -1,6 +1,6 @@
 import { BASE_URL, API_FACEBOOK_ACCOUNT, API_QUERY, API_REELS, API_FEED_TEMPLATE, API_GRAPHQL } from "./config.js"
 import { existsSync, readFileSync, writeFileSync, createWriteStream } from "fs"
-import { mkdir, writeFile, utimes } from "fs/promises"
+import { mkdir, writeFile, utimes, access, constants } from "fs/promises"
 import { dirname, join, parse } from "path"
 import { fileURLToPath } from "url"
 import GetCorrectContent from "./helpers/GetCorrectContent.js"
@@ -29,8 +29,9 @@ Object.assign(axios.defaults.headers.common, {
 	"Accept-Encoding": "gzip, deflate, br",
 	"Accept-Language": "en-US,en;q=0.9",
 	Dnt: "1",
-	Dpr: "1",
-	"Sec-Ch-Ua-Full-Version-List": '"Chromium";v="134.0.6998.177", "Not:A-Brand";v="24.0.0.0", "Google Chrome";v="134.0.6998.177"',
+	"Sec-Ch-Prefers-Color-Scheme": "dark",
+	"Sec-Ch-Ua": '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
+	"Sec-Ch-Ua-Full-Version-List": '"Google Chrome";v="137.0.7151.69", "Chromium";v="137.0.7151.69", "Not/A)Brand";v="24.0.0.0"',
 	"Sec-Ch-Ua-Mobile": "?0",
 	"Sec-Ch-Ua-Model": '""',
 	"Sec-Ch-Ua-Platform": '"Windows"',
@@ -38,7 +39,7 @@ Object.assign(axios.defaults.headers.common, {
 	"Sec-Fetch-Dest": "empty",
 	"Sec-Fetch-Mode": "cors",
 	"Upgrade-Insecure-Requests": "1",
-	"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36"
+	"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
 })
 
 Object.assign(axios.defaults.headers.get, {
@@ -53,10 +54,14 @@ const userIdRegexArray = [
 	/profilePage_(\d+)/
 ]
 
-const fbTokenRegexArray = [
-	/"s":"XPolarisProfileController","w":0,"f":"([\w-]+:\d+:\d+)","l":/,
-	/"token":"([\w-]+:\d+:\d+)"/
-]
+/** @param {import("fs").PathLike} path */
+async function exists(path){
+	return new Promise(resolve => {
+		access(path, constants.F_OK)
+			.then(() => resolve(true))
+			.catch(() => resolve(false))
+	})
+}
 
 export default class Downloader {
 	/** @type {import("./typings/api.js").APIHeaders} */ headers = {
@@ -69,7 +74,6 @@ export default class Downloader {
 	/** @type {number | undefined} */ limit
 	/** @type {import("./typings/index.d.ts").Config} */ config
 	/** @type {Queue<ReturnType<typeof this.Download>>} */ queue
-	/** @type {string | undefined} */ fbToken
 	/** @type {boolean} */ debug
 	/** @type {boolean} */ flatDir
 	/** @type {boolean} */ withThumbs
@@ -343,21 +347,31 @@ export default class Downloader {
 	 * @param {string} [username]
 	 */
 	async GetUser(userId, username){
-		const { fbToken } = this
-
 		/** @type {import("axios").AxiosResponse<import("./typings/api.js").QueryUserAPIResponse>} */
 		const response = await this.Request(new URL(API_GRAPHQL, BASE_URL), "POST", {
 			data: new URLSearchParams({
-				fb_dtsg: fbToken,
+				__d: "www",
+				__user: "0",
+				__a: "1",
+				__ccg: "EXCELLENT",
+				__crn: "comet.igweb.PolarisProfilePostsTabRoute",
+				dpr: "1",
+				fb_api_caller_class: "RelayModern",
+				fb_api_req_friendly_name: "PolarisProfilePageContentQuery",
 				variables: JSON.stringify({
 					id: userId,
 					render_surface: "PROFILE"
 				}),
-				doc_id: "25313068075003303"
+				server_timestamps: "true",
+				doc_id: "9916454141777118"
 			}),
 			headers: {
-				Referer: username ? this.GetUserProfileLink(username) : BASE_URL + "/"
+				Accept: "*/*",
+				Referer: username ? this.GetUserProfileLink(username) : BASE_URL + "/",
+				"X-Fb-Friendly-Name": "PolarisProfilePageContentQuery",
+				"X-Root-Field-Name": "fetch__XDTUserDict"
 			},
+			maxRedirects: 0,
 			responseType: "json"
 		})
 
@@ -384,6 +398,8 @@ export default class Downloader {
 			const { data } = await this.Request(url, "GET", {
 				headers: {
 					Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+					Cookie: undefined,
+					Dpr: "1",
 					Priority: "u=0, i",
 					"Sec-Fetch-Dest": "document",
 					"Sec-Fetch-Mode": "navigate",
@@ -392,20 +408,13 @@ export default class Downloader {
 					"X-Csrftoken": undefined,
 					"X-Ig-App-Id": undefined
 				},
-				responseType: "text"
+				responseType: "text",
+				maxRedirects: 0
 			})
-
-			try{
-				const fbToken = FindRegexArray(data, fbTokenRegexArray)
-				if(!fbToken) throw "Token was not found"
-
-				this.fbToken = fbToken
-			}catch(error){
-				Log(new Error("Failed to set facebook token", { cause: error }))
-			}
 
 			return FindRegexArray(data, userIdRegexArray) || null
 		}catch(error){
+			if(this.debug) Debug(error)
 			throw new Error(`Failed to get user ID (${username})`, { cause: error })
 		}
 	}
@@ -437,7 +446,9 @@ export default class Downloader {
 				!sessionid ||
 				sessionid === '""' ||
 				!vary.includes("Cookie")
-			) throw "GetHighlights: Unauthenticated or login session expired"
+			){
+				throw "GetHighlights: Unauthenticated or login session expired"
+			}
 
 			const { data: { highlights } } = response.data
 
@@ -608,11 +619,9 @@ export default class Downloader {
 	async DownloadStories(user_id, folder, limit = Infinity, username){
 		const results = await this.GetStories(/** @type {`${number}`} */ (user_id), username)
 
-		if(!results) return Log("No stories found")
+		if(!results?.items?.length) return Log("No stories found")
 
 		const { items: stories } = results
-
-		if(!stories.length) return
 
 		Log("Downloading stories")
 
@@ -689,9 +698,9 @@ export default class Downloader {
 	 * @param {(import("./typings/api.js").FeedItem | import("./typings/api.js").GraphHighlightsMedia | import("./typings/api.js").GraphReelsMedia)[]} items
 	 * @param {string} folder
 	 * @param {{ count: number, limit: number }} [data]
-	 * @param {string} [username]
+	 * @param {string} [_username]
 	 */
-	async DownloadItems(items, folder, data, username){
+	async DownloadItems(items, folder, data, _username){
 		const { withThumbs } = this
 
 		/** @type {Map<string, Date>} */
@@ -773,7 +782,19 @@ export default class Downloader {
 		await Promise.all(Array.from(urls.entries()).map(async ([url, date]) => {
 			try{
 				await this.Download(url, folders.get(url) || folder, date, undefined, {
-					headers: { Referer: username ? this.GetUserProfileLink(username) : BASE_URL + "/" }
+					headers: {
+						Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+						"Cache-Control": "no-cache",
+						Pragma: "no-cache",
+						Priority: "i",
+						"Sec-Fetch-Dest": "image",
+						"Sec-Fetch-Mode": "cors",
+						"Sec-Fetch-Site": "cross-site",
+						Referer: "https://www.instagram.com/",
+						Cookie: undefined,
+						"X-Csrftoken": undefined,
+						"X-Ig-App-Id": undefined
+					}
 				})
 			}catch(error){
 				Log(error instanceof Error ? error : new Error(String(error)))
@@ -801,9 +822,8 @@ export default class Downloader {
 
 		const path = join(folder, filename)
 
-		if(existsSync(path)){
-			// Skip re-download of already downloaded content
-			// TODO: need to check for all files with the same name but different extension due to the use of sharp for correct extension
+		// Skip re-download of already downloaded content
+		if(await exists(path) || (ext === ".webp" && await exists(join(folder, `${path}.jpg`)))){
 			return path
 		}
 
@@ -818,8 +838,11 @@ export default class Downloader {
 				return
 			}
 
-			const { format } = await sharp(data).metadata()
-			const path = join(folder, `${name}.${format === "jpeg" ? "jpg" : format}`)
+			let { format } = await sharp(data).metadata()
+
+			if(format === "jpeg") format = "jpg"
+
+			const path = join(folder, `${name}.${format}`)
 
 			await writeFile(path, data)
 			await utimes(path, new Date, date)
@@ -870,6 +893,10 @@ export default class Downloader {
 			...config.headers
 		}
 
+		Object.entries(config.headers).forEach(([key, value]) => {
+			if(value === undefined) delete config.headers[key]
+		})
+
 		try{
 			/** @type {import("axios").AxiosResponse<T>} */
 			const response = await axios({
@@ -914,15 +941,6 @@ export default class Downloader {
 				config.app_id = appId
 			}catch(error){
 				Log(new Error("Failed to set App ID", { cause: error }))
-			}
-
-			try{
-				const fbToken = FindRegexArray(response.data, fbTokenRegexArray)
-				if(!fbToken) throw "Token was not found"
-
-				this.fbToken = fbToken
-			}catch(error){
-				Log(new Error("Failed to set Facebook token", { cause: error }))
 			}
 
 			this.UpdateHeaders()

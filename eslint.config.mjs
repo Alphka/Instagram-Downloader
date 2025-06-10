@@ -145,6 +145,7 @@ const eslintConfig = [
 			"no-unsafe-optional-chaining": "error",
 			"no-unused-labels": "error",
 			"no-unused-private-class-members": "error",
+			"no-unused-vars": "off",
 			"no-use-before-define": ["error", "nofunc"],
 			"no-useless-backreference": "error",
 			"no-useless-catch": "error",
