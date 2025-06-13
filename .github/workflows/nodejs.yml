@@ -15,7 +15,7 @@ jobs:
           ubuntu-latest
         ]
         node-version: [
-          20.3.0
+          24.0.1
         ]
 
     steps:
