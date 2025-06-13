@@ -110,10 +110,28 @@ export default class Downloader {
 	}
 	SetConfig(){
 		if(!existsSync(configPath)){
-			const { TOKEN, USER_ID, SESSION_ID } = process.env
+			const { TOKEN, USER_ID, SESSION_ID, COOKIES } = process.env
+
+			/** @type {typeof this.config["cookie"] | undefined} */
+			let envCookiesObject
+
+			if(COOKIES){
+				try{
+					const object = JSON.parse(COOKIES)
+
+					if(!object || typeof object !== "object"){
+						throw new TypeError("The configuration value is not an object")
+					}
+
+					envCookiesObject = object
+				}catch(cause){
+					Log(new Error("Error parsing COOKIES environment variable", { cause }))
+				}
+			}
 
 			this.config = {
 				cookie: {
+					...envCookiesObject,
 					csrftoken: TOKEN,
 					ds_user_id: USER_ID,
 					sessionid: SESSION_ID
@@ -784,14 +802,14 @@ export default class Downloader {
 				await this.Download(url, folders.get(url) || folder, date, undefined, {
 					headers: {
 						Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-						"Cache-Control": "no-cache",
+						Cookie: undefined,
 						Pragma: "no-cache",
+						Referer: BASE_URL + "/",
 						Priority: "i",
+						"Cache-Control": "no-cache",
 						"Sec-Fetch-Dest": "image",
 						"Sec-Fetch-Mode": "cors",
 						"Sec-Fetch-Site": "cross-site",
-						Referer: "https://www.instagram.com/",
-						Cookie: undefined,
 						"X-Csrftoken": undefined,
 						"X-Ig-App-Id": undefined
 					}
@@ -838,11 +856,8 @@ export default class Downloader {
 				return
 			}
 
-			let { format } = await sharp(data).metadata()
-
-			if(format === "jpeg") format = "jpg"
-
-			const path = join(folder, `${name}.${format}`)
+			const { format } = await sharp(data).metadata()
+			const path = join(folder, `${name}.${format === "jpeg" ? "jpg" : format}`)
 
 			await writeFile(path, data)
 			await utimes(path, new Date, date)

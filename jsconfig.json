@@ -23,7 +23,8 @@
 	],
 	"include": [
 		"src",
-		"tests/*.test.js"
+		"tests/*.test.js",
+		"eslint.config.mjs"
 	],
 	"typeAcquisition": {
 		"enable": true

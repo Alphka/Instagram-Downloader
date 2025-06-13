@@ -42,3 +42,4 @@ jobs:
           TOKEN: ${{ secrets.TOKEN }}
           USER_ID: ${{ secrets.USERID }}
           SESSION_ID: ${{ secrets.SESSIONID }}
+          COOKIES: ${{ secrets.COOKIES }}

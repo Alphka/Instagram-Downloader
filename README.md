@@ -52,6 +52,11 @@ npm link
 > fill all the environment variables there with your account credentials that are stored in the browser's cookies.
 > This program will not work without authentication.
 
+> [!NOTE]
+> If the code fails, even after setting your account credentials in the `.env` file, try setting the `COOKIES`
+> property with a JSON object, like this: `COOKIES={"datr":"...","ig_did":"..."}`, and deleting the `config.json` file.
+> This avoids authentication issues with the Instagram API.
+
 ### License
 
 [ISC](LICENSE.md) © 2023 Kayo Souza

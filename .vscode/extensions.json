@@ -6,6 +6,7 @@
 		"ms-vscode.vscode-typescript-next",
 		"visualstudioexptteam.intellicode-api-usage-examples",
 		"visualstudioexptteam.vscodeintellicode",
-		"christian-kohler.npm-intellisense"
+		"christian-kohler.npm-intellisense",
+		"streetsidesoftware.code-spell-checker"
 	]
 }

@@ -1,6 +1,3 @@
-/* eslint-disable */
-
-import { mkdir, readdir, rm } from "fs/promises"
 import { fileURLToPath } from "url"
 import { dirname, join } from "path"
 import { existsSync } from "fs"
@@ -13,37 +10,47 @@ import "dotenv/config"
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
+const hasConfigFile = existsSync(join(__dirname, "config.json"))
+
 const {
 	TOKEN,
 	USER_ID,
-	SESSION_ID
+	SESSION_ID,
+	COOKIES
 } = process.env
 
 if(!TOKEN) throw new Error("TOKEN must be set in process.env")
 if(!USER_ID) throw new Error("USER_ID must be set in process.env")
 if(!SESSION_ID) throw new Error("SESSION_ID must be set in process.env")
 
-const username = "instagram"
-const root = join(__dirname, "..")
-const output = join(root, "output")
-const folder = join(output, username)
+if(!COOKIES && !hasConfigFile){
+	console.warn("COOKIES was not set in process.env, the tests may fail")
+}
 
-test("Username validation", () => {
-	assert.throws(() => ValidateUsername("instagram-"), "hyphens are not allowed")
-	assert.throws(() => ValidateUsername("instagram/"), "slashes are not allowed")
-	assert.throws(() => ValidateUsername("@instagram"), "symbols are not allowed")
-	assert.throws(() => ValidateUsername("instagram "), "trailing spaces are not allowed")
-	assert.throws(() => ValidateUsername(" instagram"), "trailing spaces are not allowed")
-	assert.throws(() => ValidateUsername("instagram."), "trailing dots are not allowed")
-	assert.throws(() => ValidateUsername(".instagram"), "trailing dots are not allowed")
-	assert.throws(() => ValidateUsername("instagr..am"), "two or more consecutive dots are not allowed")
-	assert.throws(() => ValidateUsername("instagr...am"), "two or more consecutive dots are not allowed")
-	assert.throws(() => ValidateUsername("instagraaaaaaaaaaaaaaaaaaaaaaam"), "the length must be between 1 and 64 characters")
+test("Username validation", t => {
+	t.test("should throw with invalid usernames", () => {
+		assert.throws(() => ValidateUsername("instagram-"), "hyphens are not allowed")
+		assert.throws(() => ValidateUsername("instagram/"), "slashes are not allowed")
+		assert.throws(() => ValidateUsername("@instagram"), "symbols are not allowed")
+		assert.throws(() => ValidateUsername("instagram "), "trailing spaces are not allowed")
+		assert.throws(() => ValidateUsername(" instagram"), "trailing spaces are not allowed")
+		assert.throws(() => ValidateUsername("instagram."), "trailing dots are not allowed")
+		assert.throws(() => ValidateUsername(".instagram"), "trailing dots are not allowed")
+		assert.throws(() => ValidateUsername("instagr..am"), "two or more consecutive dots are not allowed")
+		assert.throws(() => ValidateUsername("instagr...am"), "two or more consecutive dots are not allowed")
+		assert.throws(() => ValidateUsername("instagraaaaaaaaaaaaaaaaaaaaaaam"), "the length must be between 1 and 64 characters")
+	})
 
-	assert.doesNotThrow(() => ValidateUsername("instagram"))
+	t.test("should pass with valid usernames", () => {
+		assert.doesNotThrow(() => ValidateUsername("instagram"))
+		assert.doesNotThrow(() => ValidateUsername("instagram_"))
+		assert.doesNotThrow(() => ValidateUsername("_instagram"))
+		assert.doesNotThrow(() => ValidateUsername("instagram.23"))
+	})
 })
 
 test("Instagram API", async t => {
+	const username = "instagram"
 	const downloader = new Downloader(username, 12)
 
 	t.test("should create config object", () => {
