@@ -57,9 +57,7 @@ export default class Queue {
 
 		this._queueCallbacks.set(item, value => (value instanceof Error ? reject : resolve)(value))
 
-		const value = await promise
-
-		return value
+		return await promise
 	}
 	RunQueue(){
 		if(this.running) return

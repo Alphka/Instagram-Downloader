@@ -482,11 +482,8 @@ export default class Downloader {
 	/**
 	 * @param {import("./typings/api.js").HighlightId[]} reelsIds
 	 * @param {string} [username]
-	 * @param {number} [first]
 	 */
-	async GetHighlightsContents(reelsIds, username, first){
-		first ??= this.queue?.limit ?? 10
-
+	async GetHighlightsContents(reelsIds, username){
 		/**
 		 * @type {import("axios").AxiosResponse<
 		 * 	| import("./typings/api.js").HighlightsAPIResponse
@@ -560,7 +557,6 @@ export default class Downloader {
 
 		const highlightsMap = new Map(highlights.map(reel => [reel.id, reel]))
 
-		const filesSet = /** @type {Set<string>} */ (new Set)
 		let hasHighlights = Boolean(highlights.length)
 		let count = 0
 
@@ -584,11 +580,6 @@ export default class Downloader {
 
 				if(items.length){
 					await mkdir(target_dir, { recursive: true })
-				}
-
-				for(const item of items){
-					const { url } = GetCorrectContent(item)[0]
-					filesSet.add(GetURLFilename(url))
 				}
 
 				const shouldDownloadCover = hcover && highlightsMap.has(id)
@@ -707,7 +698,19 @@ export default class Downloader {
 
 				hasMore = more_available
 				lastId = next_max_id
-			}else Log(new Error("Failed to get timeline, lastId: " + (lastId || null)))
+			}else{
+				/** @type {any} */
+				const data = response?.data
+
+				const message = `Failed to get timeline ${[
+					`Last ID: ${lastId || null}`,
+					response
+						? `typeof response: ${typeof response}`
+						: `Response data: ${typeof data === "string" ? data.trim() : data}`
+				].map(e => "\t" + e).join("\n")}`
+
+				Log(new Error(message))
+			}
 		}
 
 		if(count === 0) Log("No content found in timeline")
@@ -874,7 +877,15 @@ export default class Downloader {
 			const file = createWriteStream(path)
 
 			return new Promise((resolve, reject) => {
-				file.on("close", () => utimes(path, date, date).then(() => resolve(path)).catch(reject))
+				file.on("close", async () => {
+					try{
+						await utimes(path, date, date)
+						resolve(path)
+					}catch(error){
+						reject(error)
+					}
+				})
+
 				file.on("error", reject)
 				data.pipe(file)
 			})

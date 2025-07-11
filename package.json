@@ -5,9 +5,9 @@
 	"description": "An application to download content from Instagram",
 	"main": "src/index.js",
 	"scripts": {
-		"start": "node --no-warnings .",
-		"test": "node --no-warnings --test tests/index.test.js",
-		"test:watch": "node --no-warnings --test --watch tests/index.test.js",
+		"start": "node .",
+		"test": "node --test tests/index.test.js",
+		"test:watch": "node --test --watch tests/index.test.js",
 		"lint": "eslint .",
 		"lint:tsc": "tsc -p jsconfig.json"
 	},
@@ -21,24 +21,26 @@
 		"videos"
 	],
 	"dependencies": {
-		"axios": "^1.9.0",
+		"axios": "^1.10.0",
 		"chalk": "^5.4.1",
 		"commander": "^12.1.0",
-		"dotenv": "^16.5.0",
+		"dotenv": "^16.6.1",
 		"filenamify": "^6.0.0",
-		"mime": "^3.0.0",
-		"sharp": "^0.34.1"
+		"mime": "^4.0.7",
+		"sharp": "^0.34.3"
 	},
 	"devDependencies": {
 		"@eslint/eslintrc": "^3.3.1",
-		"@eslint/js": "^9.26.0",
-		"@stylistic/eslint-plugin": "^4.2.0",
-		"@types/mime": "^3.0.4",
-		"@types/node": "^22.15.17",
-		"eslint-plugin-n": "^17.18.0",
-		"eslint-plugin-regexp": "^2.7.0",
+		"@stylistic/eslint-plugin": "^5.1.0",
+		"@types/node": "^24.0.13",
+		"@typescript-eslint/eslint-plugin": "^8.36.0",
+		"@typescript-eslint/parser": "^8.36.0",
+		"eslint": "^9.30.1",
+		"eslint-plugin-n": "^17.21.0",
+		"eslint-plugin-regexp": "^2.9.0",
+		"eslint-plugin-sonarjs": "^3.0.4",
 		"eslint-plugin-unused-imports": "^4.1.4",
-		"globals": "^16.1.0",
+		"globals": "^16.3.0",
 		"typescript": "^5.8.3"
 	},
 	"repository": {
