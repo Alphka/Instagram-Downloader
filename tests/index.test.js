@@ -65,7 +65,7 @@ test("Instagram API", async t => {
 	}) */
 
 	t.test("should update headers", () => {
-		downloader.config.csrftoken = downloader.config.cookie.csrftoken = TOKEN
+		downloader.config.cookie.csrftoken = TOKEN
 		downloader.config.cookie.ds_user_id = USER_ID
 		downloader.config.cookie.sessionid = SESSION_ID
 

@@ -470,16 +470,6 @@ export interface ReelOwner extends ReelUser {
 	__typename: "GraphUser"
 }
 
-export interface FeedAPIResponse {
-	items: FeedItem[]
-	num_results: number
-	more_available?: boolean
-	next_max_id?: string
-	user?: GenericUser
-	auto_load_more_enabled?: boolean
-	status: APIStatus
-}
-
 export interface QueryHighlightsAPIResponse {
 	data: {
 		highlights: {
@@ -513,517 +503,161 @@ export interface QueryHighlightsAPIResponse {
 	status: APIStatus
 }
 
+export interface GraphTimelineMedia {
+	pk: string
+	id: string
+	code: string
+	ad_id: null
+	boosted_status: null
+	boost_unavailable_identifier: null
+	boost_unavailable_reason: null
+	caption: Caption | null
+	caption_is_edited: boolean
+	feed_demotion_control: null
+	feed_recs_demotion_control: null
+	taken_at: number
+	inventory_source: null
+	video_versions?: VideoVersion[]
+	is_dash_eligible: number
+	number_of_qualities: number
+	video_dash_manifest?: string
+	image_versions2: FeedItem["image_versions2"]
+	sharing_friction_info: FeedItem["sharing_friction_info"]
+	is_paid_partnership: boolean
+	sponsor_tags: null
+	affiliate_info: null
+	original_height?: number
+	original_width?: number
+	organic_tracking_token: string
+	story_cta: null
+	link: null
+	user: FeedItem["user"]
+	group: null
+	owner: {
+		pk: string
+		id: string
+		profile_pic_url: string
+		username: string
+		friendship_status: {
+			is_feed_favorite: boolean
+			following: boolean
+			is_restricted: boolean
+			is_bestie: boolean
+		}
+		is_embeds_disabled: boolean
+		is_unpublished: boolean
+		is_verified: boolean
+		show_account_transparency_details: boolean
+		supervision_info: null
+		transparency_product: null
+		transparency_product_enabled: boolean
+		transparency_label: null
+		ai_agent_owner_username: null
+		is_private: boolean
+		__typename: string
+	}
+	coauthor_producers?: FeedItem["coauthor_producers"]
+	invited_coauthor_producers: any[]
+	follow_hashtag_info: null
+	title: null
+	comment_count: number
+	comments_disabled?: FeedItem["comments_disabled"]
+	commenting_disabled_for_viewer: null
+	like_and_view_counts_disabled: boolean
+	has_liked: boolean
+	top_likers: any[]
+	facepile_top_likers: any[]
+	like_count: number
+	preview: null
+	can_see_insights_as_brand: boolean
+	social_context: null
+	view_count?: number
+	can_reshare: null
+	can_viewer_reshare: boolean
+	ig_media_sharing_disabled: boolean
+	photo_of_you?: boolean
+	product_type: FeedItem["product_type"]
+	usertags?: FeedItem["usertags"]
+	media_overlay_info: null
+	carousel_parent_id: null
+	carousel_media_count?: FeedItem["carousel_media_count"]
+	carousel_media?: FeedItem["carousel_media"]
+	location?: FeedItem["location"]
+	has_audio?: boolean
+	clips_metadata: FeedItem["clips_metadata"]
+	clips_attribution_info: null
+	wearable_attribution_info: null
+	accessibility_caption?: string | null
+	audience: null
+	display_uri: null
+	media_cropping_info?: FeedItem["media_cropping_info"]
+	profile_grid_thumbnail_fitting_style: string
+	thumbnails: null
+	timeline_pinned_user_ids: string[]
+	upcoming_event: null
+	logging_info_token: null
+	explore: null
+	main_feed_carousel_starting_media_id: null
+	is_seen: null
+	open_carousel_submission_state: null
+	previous_submitter: null
+	all_previous_submitters: null
+	headline: null
+	comments?: FeedItem["comments"]
+	hidden_likes_string_variant: number
+	fb_like_count: null
+	crosspost_metadata: {
+		is_feedback_aggregated: null
+	}
+	saved_collection_ids: null
+	has_viewer_saved?: boolean
+	__typename: string
+}
+
 export interface QueryTimelineAPIResponse {
 	data: {
-		xdt_api__v1__feed__timeline__connection: {
+		xdt_api__v1__feed__user_timeline_graphql_connection: {
 			page_info: {
+				start_cursor: string | null
 				end_cursor: string
 				has_previous_page: boolean
 				has_next_page: boolean
 			}
 			edges: {
-				node: {
-					media?: {
-						taken_at: number
-						pk: string
-						id: string
-						device_timestamp: number
-						media_type: number
-						code: string
-						client_cache_key: string
-						filter_type: number
-						is_unified_video: boolean
-						should_request_ads: boolean
-						original_media_has_visual_reply_media: boolean
-						caption_is_edited: boolean
-						like_and_view_counts_disabled: boolean
-						commerciality_status: string
-						is_paid_partnership: boolean
-						is_visual_reply_commenter_notice_enabled: boolean
-						clips_tab_pinned_user_ids: any[]
-						has_delayed_metadata: boolean
-						comment_likes_enabled: boolean
-						comment_threading_enabled: boolean
-						max_num_visible_preview_comments: number
-						has_more_comments: boolean
-						preview_comments: any[]
-						photo_of_you: boolean
-						is_organic_product_tagging_eligible: boolean
-						can_see_insights_as_brand: boolean
-						user: {
-							has_anonymous_profile_picture: boolean
-							show_account_transparency_details: boolean
-							fan_club_info: {
-								fan_club_id: any
-								fan_club_name: any
-								is_fan_club_referral_eligible: any
-								fan_consideration_page_revamp_eligiblity: any
-								is_fan_club_gifting_eligible: any
-							}
-							transparency_product_enabled: boolean
-							is_favorite: boolean
-							is_unpublished: boolean
-							pk: string
-							pk_id: string
-							username: string
-							full_name: string
-							is_private: boolean
-							is_verified: boolean
-							friendship_status: {
-								following: boolean
-								outgoing_request: boolean
-								is_muting_reel: boolean
-								is_bestie: boolean
-								is_restricted: boolean
-								is_feed_favorite: boolean
-							}
-							profile_pic_id: string
-							profile_pic_url: string
-							account_badges: any[]
-							latest_reel_media: number
-						}
-						can_viewer_reshare: boolean
-						like_count: number
-						fb_like_count?: number
-						has_liked: boolean
-						top_likers: string[]
-						facepile_top_likers: GenericUser[]
-						preview: string
-						image_versions2: {
-							candidates: ImageVersion[]
-							additional_candidates?: AdditionalCandidates<ImageVersion>
-							smart_thumbnail_enabled?: boolean
-						}
-						original_width: number
-						original_height: number
-						caption: Caption | null
-						comment_inform_treatment: {
-							should_have_inform_treatment: boolean
-							text: string
-							url: any
-							action_type: any
-						}
-						sharing_friction_info: {
-							should_have_sharing_friction: boolean
-							bloks_app_url: any
-							sharing_friction_payload: any
-						}
-						is_dash_eligible?: number
-						video_dash_manifest?: string
-						video_codec?: string
-						number_of_qualities?: number
-						video_versions?: {
-							type: number
-							width: number
-							height: number
-							url: string
-							id: string
-						}[]
-						has_audio?: boolean
-						video_duration?: number
-						can_viewer_save: boolean
-						is_in_profile_grid: boolean
-						profile_grid_control_enabled: boolean
-						view_count?: number
-						play_count?: number
-						fb_play_count?: number
-						organic_tracking_token: string
-						third_party_downloads_enabled?: boolean
-						has_shared_to_fb: number
-						product_type: string
-						show_shop_entrypoint: boolean
-						deleted_reason: number
-						integrity_review_decision: string
-						commerce_integrity_review_decision: any
-						music_metadata?: {
-							music_canonical_id: string
-							audio_type: any
-							music_info: any
-							original_sound_info: any
-							pinned_media_ids: any
-						}
-						is_artist_pick: boolean
-						ig_media_sharing_disabled: boolean
-						clips_metadata?: ClipsMetadata
-						media_cropping_info?: MediaCroppingInfo
-						logging_info_token: string
-						inventory_source: string
-						is_seen: boolean
-						is_eof: boolean
-						ranking_weight: number
-						can_view_more_preview_comments: boolean
-						hide_view_all_comment_entrypoint: boolean
-						comments: any[]
-						comment_count: number
-						inline_composer_display_condition: string
-						accessibility_caption?: string
-					}
-					end_of_feed_demarcator?: {
-						id: string
-						title: string
-						subtitle: string
-						style: string
-						pause: boolean
-						group_set: {
-							id: string
-							format: string
-							active_group_id: string
-							connected_group_id: string
-							remember_group_choice: boolean
-							style: any
-							groups: {
-								id: string
-								title: string
-								show_group_text: string
-								feed_items: {
-									media?: {
-										taken_at: number
-										pk: string
-										id: string
-										device_timestamp: number
-										media_type: number
-										code: string
-										client_cache_key: string
-										filter_type: number
-										accessibility_caption: string
-										is_unified_video: boolean
-										should_request_ads: boolean
-										original_media_has_visual_reply_media: boolean
-										caption_is_edited: boolean
-										like_and_view_counts_disabled: boolean
-										commerciality_status: string
-										is_paid_partnership: boolean
-										is_visual_reply_commenter_notice_enabled: boolean
-										clips_tab_pinned_user_ids: any[]
-										has_delayed_metadata: boolean
-										comment_likes_enabled: boolean
-										comment_threading_enabled: boolean
-										max_num_visible_preview_comments: number
-										has_more_comments: boolean
-										preview_comments: any[]
-										photo_of_you: boolean
-										usertags: {
-											in: {
-												user: GenericUser
-												position: number[]
-												start_time_in_video_in_sec: any
-												duration_in_video_in_sec: any
-											}[]
-										}
-										is_organic_product_tagging_eligible: boolean
-										can_see_insights_as_brand: boolean
-										user: {
-											has_anonymous_profile_picture: boolean
-											show_account_transparency_details: boolean
-											fan_club_info: {
-												fan_club_id: any
-												fan_club_name: any
-												is_fan_club_referral_eligible: any
-												fan_consideration_page_revamp_eligiblity: any
-												is_fan_club_gifting_eligible: any
-											}
-											transparency_product_enabled: boolean
-											is_favorite: boolean
-											is_unpublished: boolean
-											pk: string
-											pk_id: string
-											username: string
-											full_name: string
-											is_private: boolean
-											is_verified: boolean
-											friendship_status: {
-												following: boolean
-												outgoing_request: boolean
-												is_muting_reel: boolean
-												is_bestie: boolean
-												is_restricted: boolean
-												is_feed_favorite: boolean
-											}
-											profile_pic_id: string
-											profile_pic_url: string
-											account_badges: any[]
-											latest_reel_media: number
-										}
-										can_viewer_reshare: boolean
-										like_count: number
-										has_liked: boolean
-										top_likers: any[]
-										facepile_top_likers: any[]
-										preview: string
-										image_versions2: {
-											candidates: {
-												width: number
-												height: number
-												url: string
-											}[]
-										}
-										original_width: number
-										original_height: number
-										caption: {
-											pk: string
-											user_id: string
-											text: string
-											type: number
-											created_at: number
-											created_at_utc: number
-											content_type: string
-											status: string
-											bit_flags: number
-											did_report_as_spam: boolean
-											share_enabled: boolean
-											user: {
-												pk: string
-												pk_id: string
-												username: string
-												full_name: string
-												is_private: boolean
-												is_verified: boolean
-												profile_pic_id: string
-												profile_pic_url: string
-												fbid_v2: string
-											}
-											is_covered: boolean
-											is_ranked_comment: boolean
-											media_id: string
-											private_reply_status: number
-										}
-										comment_inform_treatment: {
-											should_have_inform_treatment: boolean
-											text: string
-											url: any
-											action_type: any
-										}
-										sharing_friction_info: {
-											should_have_sharing_friction: boolean
-											bloks_app_url: any
-											sharing_friction_payload: any
-										}
-										can_viewer_save: boolean
-										is_in_profile_grid: boolean
-										profile_grid_control_enabled: boolean
-										organic_tracking_token: string
-										has_shared_to_fb: number
-										product_type: string
-										show_shop_entrypoint: boolean
-										deleted_reason: number
-										integrity_review_decision: string
-										commerce_integrity_review_decision: any
-										music_metadata: {
-											music_canonical_id: string
-											audio_type: any
-											music_info: any
-											original_sound_info: any
-											pinned_media_ids: any
-										}
-										is_artist_pick: boolean
-										ig_media_sharing_disabled: boolean
-										logging_info_token: string
-										inventory_source: string
-										is_seen: boolean
-										is_eof: boolean
-										ranking_weight: number
-										can_view_more_preview_comments: boolean
-										hide_view_all_comment_entrypoint: boolean
-										comments: any[]
-										comment_count: number
-										inline_composer_display_condition: string
-									}
-									explore_story?: {
-										media: {
-											taken_at: number
-											pk: string
-											id: string
-											device_timestamp: number
-											media_type: number
-											code: string
-											client_cache_key: string
-											filter_type: number
-											accessibility_caption: string
-											is_unified_video: boolean
-											should_request_ads: boolean
-											original_media_has_visual_reply_media: boolean
-											caption_is_edited: boolean
-											like_and_view_counts_disabled: boolean
-											commerciality_status: string
-											is_paid_partnership: boolean
-											is_visual_reply_commenter_notice_enabled: boolean
-											clips_tab_pinned_user_ids: any[]
-											has_delayed_metadata: boolean
-											comment_likes_enabled: boolean
-											comment_threading_enabled: boolean
-											max_num_visible_preview_comments: number
-											has_more_comments: boolean
-											preview_comments: any[]
-											photo_of_you: boolean
-											is_organic_product_tagging_eligible: boolean
-											can_see_insights_as_brand: boolean
-											user: {
-												has_anonymous_profile_picture: boolean
-												show_account_transparency_details: boolean
-												fan_club_info: {
-													fan_club_id: any
-													fan_club_name: any
-													is_fan_club_referral_eligible: any
-													fan_consideration_page_revamp_eligiblity: any
-													is_fan_club_gifting_eligible: any
-												}
-												transparency_product_enabled: boolean
-												latest_reel_media: number
-												is_favorite: boolean
-												is_unpublished: boolean
-												pk: string
-												pk_id: string
-												username: string
-												full_name: string
-												is_private: boolean
-												is_verified: boolean
-												friendship_status: {
-													following: boolean
-													outgoing_request: boolean
-													is_bestie: boolean
-													is_restricted: boolean
-													is_feed_favorite: boolean
-												}
-												profile_pic_id: string
-												profile_pic_url: string
-												account_badges: any[]
-											}
-											can_viewer_reshare: boolean
-											like_count: number
-											has_liked: boolean
-											top_likers: any[]
-											facepile_top_likers: any[]
-											preview: string
-											image_versions2: {
-												candidates: {
-													width: number
-													height: number
-													url: string
-													scans_profile?: null
-												}[]
-											}
-											original_width: number
-											original_height: number
-											caption: {
-												pk: string
-												user_id: string
-												text: string
-												type: number
-												created_at: number
-												created_at_utc: number
-												content_type: string
-												status: string
-												bit_flags: number
-												did_report_as_spam: boolean
-												share_enabled: boolean
-												user: {
-													pk: string
-													pk_id: string
-													username: string
-													full_name: string
-													is_private: boolean
-													is_verified: boolean
-													profile_pic_id: string
-													profile_pic_url: string
-													fbid_v2: string
-												}
-												is_covered: boolean
-												is_ranked_comment: boolean
-												media_id: string
-												private_reply_status: number
-												has_translation?: boolean
-											}
-											comment_inform_treatment: {
-												should_have_inform_treatment: boolean
-												text: string
-												url: any
-												action_type: any
-											}
-											sharing_friction_info: {
-												should_have_sharing_friction: boolean
-												bloks_app_url: any
-												sharing_friction_payload: any
-											}
-											can_viewer_save: boolean
-											is_in_profile_grid: boolean
-											profile_grid_control_enabled: boolean
-											organic_tracking_token: string
-											has_shared_to_fb: number
-											product_type: string
-											show_shop_entrypoint: boolean
-											deleted_reason: number
-											integrity_review_decision: string
-											commerce_integrity_review_decision: any
-											music_metadata: {
-												music_canonical_id: string
-												audio_type: any
-												music_info: any
-												original_sound_info: any
-												pinned_media_ids: any
-											}
-											is_artist_pick: boolean
-											ig_media_sharing_disabled: boolean
-											logging_info_token: string
-											score: number
-											ranking_scores: {
-												score: number
-											}
-											feed_recs_demotion_control: {
-												title: string
-												confirmation_body: string
-												enable_word_wrapping: boolean
-												confirmation_icon: string
-												title_style: string
-												confirmation_title: string
-												confirmation_title_style: string
-												undo_style: string
-												confirmation_style: string
-												followup_options: {
-													text: string
-													style: any
-													id: string
-													data?: string
-													show_icon: boolean
-													demotion_control: {
-														confirmation_style: string
-														confirmation_icon: string
-														confirmation_body: string
-														undo_style: string
-														confirmation_title?: string
-														followup_options?: {
-															text: string
-															id: string
-															style: string
-															show_icon: boolean
-															data: any
-															demotion_control: {}
-														}[]
-													}
-												}[]
-											}
-											recommendation_data: string
-											explore: {
-												explanation: string
-											}
-											can_view_more_preview_comments: boolean
-											hide_view_all_comment_entrypoint: boolean
-											comments: any[]
-											comment_count: number
-											inline_composer_display_condition: string
-											timeline_pinned_user_ids?: number[]
-										}
-										id: string
-										inventory_source: string
-									}
-								}[]
-								next_max_id: string
-								pagination_source: string
-							}[]
-						}
-					}
-				}
+				node: GraphTimelineMedia
 				cursor: string
 			}[]
+		}
+		xdt_viewer: {
+			user: {
+				id: string
+			}
+		}
+	}
+	extensions: {
+		is_final: boolean
+		all_video_dash_prefetch_representations: {
+			video_id: string
+			representations: {
+				base_url: string
+				bandwidth: number
+				width: number
+				height: number
+				mime_type: string
+				codecs: string
+				playback_resolution_mos: string
+				playback_resolution_csvqm: string | null
+				segments: {
+					start: number
+					end: number
+				}[]
+				representation_id: string
+			}[]
+			initial_representation_ids: string[]
+		}[]
+		server_metadata: {
+			request_start_time_ms: number
+			time_at_flush_ms: number
 		}
 	}
 	status: APIStatus

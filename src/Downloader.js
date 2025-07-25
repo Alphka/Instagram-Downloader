@@ -1,4 +1,4 @@
-import { BASE_URL, API_FACEBOOK_ACCOUNT, API_QUERY, API_REELS, API_FEED_TEMPLATE, API_GRAPHQL } from "./config.js"
+import { BASE_URL, API_FACEBOOK_ACCOUNT, API_QUERY, API_REELS, API_GRAPHQL } from "./config.js"
 import { existsSync, readFileSync, writeFileSync, createWriteStream } from "fs"
 import { mkdir, writeFile, utimes, access, constants } from "fs/promises"
 import { dirname, join, parse } from "path"
@@ -135,8 +135,7 @@ export default class Downloader {
 					csrftoken: TOKEN,
 					ds_user_id: USER_ID,
 					sessionid: SESSION_ID
-				},
-				csrftoken: TOKEN
+				}
 			}
 
 			this.WriteConfig(true)
@@ -186,14 +185,14 @@ export default class Downloader {
 		}
 
 		const data = {
-			TOKEN: process.env.TOKEN || config.csrftoken,
+			TOKEN: process.env.TOKEN || config.cookie.csrftoken,
 			USER_ID: process.env.USER_ID || config.cookie.ds_user_id,
 			SESSION_ID: process.env.SESSION_ID || config.cookie.sessionid
 		}
 
-		this.config.csrftoken = this.config.cookie.csrftoken = data.TOKEN
-		this.config.cookie.ds_user_id = data.USER_ID
-		this.config.cookie.sessionid = data.SESSION_ID
+		config.cookie.csrftoken = data.TOKEN
+		config.cookie.ds_user_id = data.USER_ID
+		config.cookie.sessionid = data.SESSION_ID
 
 		this.UpdateHeaders()
 
@@ -210,10 +209,10 @@ export default class Downloader {
 	}
 	UpdateHeaders(){
 		const { headers, config } = this
-		const { csrftoken, app_id, cookie } = config || {}
-		const token = csrftoken || cookie.csrftoken
+		const { app_id, cookie } = config || {}
+		const token = cookie.csrftoken
 
-		if(token) headers["X-Csrftoken"] = token
+		if(token) headers["X-Csrftoken"] = cookie.csrftoken
 		if(app_id) headers["X-Ig-App-Id"] = app_id
 
 		headers.Cookie = Object.entries(cookie).map(([key, value]) => `${key}=${value || ""}`).join("; ")
@@ -437,6 +436,51 @@ export default class Downloader {
 		}
 	}
 	/**
+	 * @param {string} username
+	 * @param {string} [after]
+	 * @param {number} [count]
+	 */
+	async GetTimeline(username, after, count = 12){
+		/** @type {import("axios").AxiosResponse<import("./typings/api.js").QueryTimelineAPIResponse>} */
+		const response = await this.Request(new URL(API_QUERY, BASE_URL), "POST", {
+			data: new URLSearchParams({
+				variables: JSON.stringify({
+					data: {
+						count,
+						include_reel_media_seen_timestamp: true,
+						include_relationship_info: true,
+						latest_besties_reel_media: true,
+						latest_reel_media: true
+					},
+					username,
+					...(after ? {
+						after,
+						before: null,
+						first: count,
+						last: null
+					} : undefined),
+					__relay_internal__pv__PolarisIsLoggedInrelayprovider: true,
+					__relay_internal__pv__PolarisShareSheetV3relayprovider: true
+				}),
+				server_timestamps: "true",
+				fb_api_caller_class: "RelayModern",
+				fb_api_req_friendly_name: "PolarisProfilePostsQuery",
+				doc_id: "24388485070759223"
+			}),
+			headers: {
+				Accept: "*/*",
+				Priority: "u=1, i",
+				Referer: username ? this.GetUserProfileLink(username) : BASE_URL + "/",
+				"Content-Type": "application/x-www-form-urlencoded",
+				"X-Fb-Friendly-Name": "PolarisProfilePostsQuery",
+				"X-Root-Field-Name": "xdt_api__v1__feed__user_timeline_graphql_connection"
+			},
+			responseType: "json"
+		})
+
+		return response.data.data.xdt_api__v1__feed__user_timeline_graphql_connection
+	}
+	/**
 	 * @param {string} user_id
 	 * @param {string} [username]
 	 */
@@ -447,10 +491,18 @@ export default class Downloader {
 		const response = await this.Request(new URL(API_QUERY, BASE_URL), "POST", {
 			data: new URLSearchParams({
 				variables: JSON.stringify({ user_id }),
-				doc_id: "8298007123561120"
+				server_timestamps: "true",
+				fb_api_caller_class: "RelayModern",
+				fb_api_req_friendly_name: "PolarisProfileStoryHighlightsTrayContentQuery",
+				doc_id: "9814547265267853"
 			}),
 			headers: {
-				Referer: username ? this.GetUserProfileLink(username) : BASE_URL + "/"
+				Accept: "*/*",
+				Priority: "u=1, i",
+				Referer: username ? this.GetUserProfileLink(username) : BASE_URL + "/",
+				"Content-Type": "application/x-www-form-urlencoded",
+				"X-Fb-Friendly-Name": "PolarisProfileStoryHighlightsTrayContentQuery",
+				"X-Root-Field-Name": "xdt_api__v1__user_id__paginated_highlights_tray_connection"
 			},
 			responseType: "json"
 		})
@@ -656,67 +708,41 @@ export default class Downloader {
 	 * @param {number} [limit]
 	 */
 	async DownloadTimeline(username, folder, limit = Infinity){
-		const url = new URL(API_FEED_TEMPLATE.replace("<username>", username), BASE_URL)
-
-		url.searchParams.set("count", "12")
-
-		/** @type {string} */
+		/** @type {string | undefined} */
 		let lastId
 		let first = true
 		let count = 0
 		let hasMore = true
 
 		while(hasMore && limit > count){
-			if(lastId) url.searchParams.set("max_id", lastId)
+			const { edges, page_info } = await this.GetTimeline(username, lastId, this.queue.limit)
 
-			/** @type {import("axios").AxiosResponse<import("./typings/api.js").FeedAPIResponse>} */
-			const response = await this.Request(url)
+			if(first){
+				first = false
 
-			if(typeof response?.data === "object"){
-				const { more_available, num_results, next_max_id, items } = response.data
-
-				if(!Array.isArray(items)) throw new Error(`Couldn't get user timeline, user: ${username}`)
-				if(!items.length) throw new Error(`No items found in timeline, user: ${username}`)
-
-				if(num_results === 0) break
-
-				if(first){
-					Log("Downloading timeline")
-					first = false
-				}
-
-				const target_dir = this.flatDir ? folder : join(folder, "timeline")
-
-				await mkdir(target_dir, { recursive: true })
-
-				const data = { count, limit }
-				const { limited } = await this.DownloadItems(items, target_dir, data, username)
-
-				count = data.count
-
-				if(limited) break
-
-				hasMore = more_available
-				lastId = next_max_id
-			}else{
-				/** @type {any} */
-				const data = response?.data
-
-				const message = `Failed to get timeline ${[
-					`Last ID: ${lastId || null}`,
-					response
-						? `typeof response: ${typeof response}`
-						: `Response data: ${typeof data === "string" ? data.trim() : data}`
-				].map(e => "\t" + e).join("\n")}`
-
-				Log(new Error(message))
+				if(edges.length) Log("Downloading timeline")
+				else break
 			}
+
+			const target_dir = this.flatDir ? folder : join(folder, "timeline")
+
+			await mkdir(target_dir, { recursive: true })
+
+			const data = { count, limit }
+			const { limited } = await this.DownloadItems(edges.map(({ node }) => node), target_dir, data, username)
+
+			count = data.count
+
+			if(limited) break
+
+			hasMore = page_info.has_next_page
+			lastId = page_info.end_cursor
 		}
 
 		if(count === 0) Log("No content found in timeline")
 	}
 	/**
-	 * @param {(import("./typings/api.js").FeedItem | import("./typings/api.js").GraphHighlightsMedia | import("./typings/api.js").GraphReelsMedia)[]} items
+	 * @param {(import("./typings/api.js").FeedItem | import("./typings/api.js").GraphTimelineMedia | import("./typings/api.js").GraphHighlightsMedia | import("./typings/api.js").GraphReelsMedia)[]} items
 	 * @param {string} folder
 	 * @param {{ count: number, limit: number }} [data]
 	 * @param {string} [_username]
@@ -941,7 +967,6 @@ export default class Downloader {
 
 				const value = encodeURIComponent(values.join("="))
 
-				if(key === "csrftoken") this.config.csrftoken = value
 				this.config.cookie[key] = value
 			})
 

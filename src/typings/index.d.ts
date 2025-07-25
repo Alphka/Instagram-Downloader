@@ -1,6 +1,5 @@
 export interface Config {
 	app_id?: string
-	csrftoken?: string
 	cookie: {
 		[key: string]: string
 	}
