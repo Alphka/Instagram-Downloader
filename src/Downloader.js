@@ -1,12 +1,14 @@
 import { BASE_URL, API_FACEBOOK_ACCOUNT, API_QUERY, API_REELS, API_GRAPHQL } from "./config.js"
-import { existsSync, readFileSync, writeFileSync, createWriteStream } from "fs"
+import { existsSync, readFileSync, writeFileSync, createWriteStream, createReadStream } from "fs"
 import { mkdir, writeFile, utimes, access, constants } from "fs/promises"
 import { dirname, join, parse } from "path"
 import { fileURLToPath } from "url"
+import { spawn } from "cross-spawn"
 import GetCorrectContent from "./helpers/GetCorrectContent.js"
 import ValidateUsername from "./helpers/ValidateUsername.js"
 import FindRegexArray from "./helpers/FindRegexArray.js"
 import GetURLFilename from "./helpers/GetURLFilename.js"
+import SplitPNGFrames from "./helpers/SplitPNGFrames.js"
 import filenamify from "filenamify"
 import isNumber from "./helpers/isNumber.js"
 import dotenv from "dotenv"
@@ -14,6 +16,7 @@ import Debug from "./helpers/Debug.js"
 import Queue from "./Queue.js"
 import axios from "axios"
 import sharp from "sharp"
+import which from "which"
 import mime from "mime"
 import Log from "./helpers/Log.js"
 
@@ -470,7 +473,7 @@ export default class Downloader {
 			headers: {
 				Accept: "*/*",
 				Priority: "u=1, i",
-				Referer: username ? this.GetUserProfileLink(username) : BASE_URL + "/",
+				Referer: this.GetUserProfileLink(username),
 				"Content-Type": "application/x-www-form-urlencoded",
 				"X-Fb-Friendly-Name": "PolarisProfilePostsQuery",
 				"X-Root-Field-Name": "xdt_api__v1__feed__user_timeline_graphql_connection"
@@ -749,6 +752,7 @@ export default class Downloader {
 	 */
 	async DownloadItems(items, folder, data, _username){
 		const { withThumbs } = this
+		const Request = this.Request.bind(this)
 
 		/** @type {Map<string, Date>} */
 		const urls = new Map
@@ -762,12 +766,145 @@ export default class Downloader {
 			limited: true
 		}
 
+		/** @type {string | null | undefined} */
+		let ffmpegPath = undefined
+
 		/**
 		 * @param {Pick<typeof items[number], "video_versions" | "image_versions2">} item
 		 * @param {Date} date
 		 * @param {string} folder
 		 */
-		function QueueItemContentDownload(item, date, folder){
+		async function QueueItemContentDownload(item, date, folder){
+			if(ffmpegPath === undefined){
+				ffmpegPath = await which("ffmpeg", { nothrow: true })
+			}
+
+			if(ffmpegPath && withThumbs && "video_versions" in item && item.video_versions){
+				try{
+					const url = item.video_versions[0].url
+					const filename = GetURLFilename(url)
+					const path = join(folder, filename)
+
+					if(!(await exists(path))){
+						const file = createWriteStream(path)
+
+						/** @type {import("axios").AxiosResponse<import("stream").PassThrough>} */
+						const { data } = await Request(url, "GET", {
+							headers: {
+								Accept: "*/*",
+								Priority: "u=1, i",
+								Cookie: undefined,
+								Pragma: "no-cache",
+								Referer: BASE_URL + "/",
+								"Cache-Control": "no-cache",
+								"Sec-Fetch-Dest": "empty",
+								"Sec-Fetch-Mode": "cors",
+								"Sec-Fetch-Site": "cross-site",
+								"X-Csrftoken": undefined,
+								"X-Ig-App-Id": undefined
+							},
+							responseType: "stream"
+						})
+
+						await new Promise((resolve, reject) => {
+							file.on("close", async () => {
+								try{
+									utimes(path, date, date)
+									resolve(path)
+								}catch(error){
+									reject(error)
+								}
+							})
+
+							file.on("error", reject)
+
+							data.pipe(file)
+						})
+					}
+
+					const ffmpegSimilarFramesProcess = spawn(ffmpegPath, [
+						"-i", "pipe:3",
+						"-vf", "mpdecimate",
+						"-f", "null",
+						"-"
+					], {
+						windowsHide: true,
+						stdio: [
+							"ignore", "pipe", "pipe",
+							"pipe"
+						]
+					})
+
+					/** @type {Buffer[]} */
+					const similarFramesChunks = []
+
+					ffmpegSimilarFramesProcess.stderr.on("data", chunk => similarFramesChunks.push(chunk))
+
+					createReadStream(path).pipe(/** @type {NodeJS.WritableStream} */ (ffmpegSimilarFramesProcess.stdio[3]))
+
+					ffmpegSimilarFramesProcess.on("close", code => {
+						if(code !== 0) return
+
+						const result = Buffer.concat(similarFramesChunks).toString().trim()
+						const similarFramesSize = +result.match(/frame=\s*(\d+)/)?.[1]
+
+						// Static video
+						if(similarFramesSize !== 0 && similarFramesSize < 5){
+							const ffmpegProcess = spawn(ffmpegPath, [
+								"-hide_banner",
+								"-loglevel", "error",
+								"-i", "pipe:3",
+								"-vf", "fps=1",
+								"-vcodec", "png",
+								"-f", "image2pipe",
+								"-threads", "4",
+								"pipe:4"
+							], {
+								windowsHide: true,
+								stdio: [
+									"ignore", "pipe", "pipe",
+									"pipe", "pipe"
+								]
+							})
+
+							/** @type {Buffer[]} */
+							const framesChunks = []
+
+							ffmpegProcess.stdio[4].on("data", chunk => framesChunks.push(chunk))
+
+							createReadStream(path).pipe(/** @type {NodeJS.WritableStream} */ (ffmpegProcess.stdio[3]))
+
+							ffmpegProcess.on("close", async code => {
+								if(code !== 0) return
+
+								const framesBuffer = Buffer.concat(framesChunks)
+								const frames = SplitPNGFrames(framesBuffer)
+									.sort((a, b) => b.byteLength - a.byteLength)
+
+								if(frames.length){
+									const { name } = parse(GetURLFilename(item.image_versions2.candidates[0].url))
+									const path = join(folder, `${name}.jpg`)
+
+									const image = await sharp(frames[0])
+										.jpeg({
+											force: true,
+											quality: 90,
+											progressive: true,
+											chromaSubsampling: "4:4:4"
+										})
+										.toBuffer()
+
+									await writeFile(path, image)
+									utimes(path, date, date)
+								}
+							})
+						}
+					})
+				}catch(error){
+					Log(new Error("Failed to extract static video frame", { cause: error }))
+				}
+			}
+
 			if(withThumbs){
 				for(const url of [item.video_versions?.[0].url, item.image_versions2.candidates[0].url].filter(Boolean)){
 					urls.set(url, date)
@@ -790,14 +927,14 @@ export default class Downloader {
 		 * @param {Date} date
 		 * @param {string} folder
 		 */
-		function Carousel(item, date, folder){
+		async function QueueCarouselDownload(item, date, folder){
 			for(const media of item.carousel_media){
 				if(shouldLimit && data.count >= data.limit){
 					limited = true
 					break
 				}
 
-				QueueItemContentDownload(media, date, folder)
+				await QueueItemContentDownload(media, date, folder)
 			}
 		}
 
@@ -816,27 +953,36 @@ export default class Downloader {
 					await mkdir(target_dir, { recursive: true })
 				}
 
-				Carousel(item, date, target_dir)
+				await QueueCarouselDownload(item, date, target_dir)
 
 				if(limited) break
 
 				continue
 			}
 
-			QueueItemContentDownload(item, date, folder)
+			await QueueItemContentDownload(item, date, folder)
 		}
 
 		await Promise.all(Array.from(urls.entries()).map(async ([url, date]) => {
 			try{
-				await this.Download(url, folders.get(url) || folder, date, undefined, {
+				const filename = GetURLFilename(url)
+
+				await this.Download(url, folders.get(url) || folder, date, filename, {
 					headers: {
-						Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+						...(filename.endsWith(".mp4") ? {
+							Accept: "*/*",
+							Priority: "u=1, i",
+							"Sec-Fetch-Dest": "empty"
+						} : {
+							Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+							Priority: "i",
+							"Sec-Fetch-Dest": "image"
+						}),
+						Dnt: "1",
 						Cookie: undefined,
 						Pragma: "no-cache",
 						Referer: BASE_URL + "/",
-						Priority: "i",
 						"Cache-Control": "no-cache",
-						"Sec-Fetch-Dest": "image",
 						"Sec-Fetch-Mode": "cors",
 						"Sec-Fetch-Site": "cross-site",
 						"X-Csrftoken": undefined,
@@ -889,7 +1035,7 @@ export default class Downloader {
 			const path = join(folder, `${name}.${format === "jpeg" ? "jpg" : format}`)
 
 			await writeFile(path, data)
-			await utimes(path, new Date, date)
+			utimes(path, date, date)
 
 			return path
 		})
@@ -899,13 +1045,14 @@ export default class Downloader {
 
 			/** @type {import("axios").AxiosResponse<import("stream").PassThrough>} */
 			const { data } = await this.Request(url, "GET", config)
-			const path = join(folder, filename)
-			const file = createWriteStream(path)
 
 			return new Promise((resolve, reject) => {
+				const path = join(folder, filename)
+				const file = createWriteStream(path)
+
 				file.on("close", async () => {
 					try{
-						await utimes(path, date, date)
+						utimes(path, date, date)
 						resolve(path)
 					}catch(error){
 						reject(error)
