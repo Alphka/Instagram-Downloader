@@ -33,8 +33,8 @@ Object.assign(axios.defaults.headers.common, {
 	"Accept-Language": "en-US,en;q=0.9",
 	Dnt: "1",
 	"Sec-Ch-Prefers-Color-Scheme": "dark",
-	"Sec-Ch-Ua": '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
-	"Sec-Ch-Ua-Full-Version-List": '"Google Chrome";v="137.0.7151.69", "Chromium";v="137.0.7151.69", "Not/A)Brand";v="24.0.0.0"',
+	"Sec-Ch-Ua": '"Google Chrome";v="143", "Chromium";v="143", "Not A(Brand";v="24"',
+	"Sec-Ch-Ua-Full-Version-List": '"Google Chrome";v="143.0.7499.193", "Chromium";v="143.0.7499.193", "Not A(Brand";v="24.0.0.0"',
 	"Sec-Ch-Ua-Mobile": "?0",
 	"Sec-Ch-Ua-Model": '""',
 	"Sec-Ch-Ua-Platform": '"Windows"',
@@ -423,7 +423,7 @@ export default class Downloader {
 					Priority: "u=0, i",
 					"Sec-Fetch-Dest": "document",
 					"Sec-Fetch-Mode": "navigate",
-					"Sec-Fetch-Site": "same-origin",
+					"Sec-Fetch-Site": "none",
 					"Sec-Fetch-User": "?1",
 					"X-Csrftoken": undefined,
 					"X-Ig-App-Id": undefined
@@ -767,7 +767,7 @@ export default class Downloader {
 		}
 
 		/** @type {string | null | undefined} */
-		let ffmpegPath = undefined
+		let ffmpegPath
 
 		/**
 		 * @param {Pick<typeof items[number], "video_versions" | "image_versions2">} item
@@ -779,134 +779,142 @@ export default class Downloader {
 				ffmpegPath = await which("ffmpeg", { nothrow: true })
 			}
 
-			if(ffmpegPath && withThumbs && "video_versions" in item && item.video_versions){
+			let shouldDownloadStaticVideo = !!ffmpegPath && withThumbs && "video_versions" in item && item.video_versions && item.image_versions2.candidates[0].width === 640
+
+			if(shouldDownloadStaticVideo){
 				try{
-					const url = item.video_versions[0].url
-					const filename = GetURLFilename(url)
-					const path = join(folder, filename)
+					const imagePath = join(folder, `${parse(GetURLFilename(item.image_versions2.candidates[0].url)).name}_static.jpg`)
 
-					if(!(await exists(path))){
-						const file = createWriteStream(path)
+					shouldDownloadStaticVideo = !(await exists(imagePath))
 
-						/** @type {import("axios").AxiosResponse<import("stream").PassThrough>} */
-						const { data } = await Request(url, "GET", {
-							headers: {
-								Accept: "*/*",
-								Priority: "u=1, i",
-								Cookie: undefined,
-								Pragma: "no-cache",
-								Referer: BASE_URL + "/",
-								"Cache-Control": "no-cache",
-								"Sec-Fetch-Dest": "empty",
-								"Sec-Fetch-Mode": "cors",
-								"Sec-Fetch-Site": "cross-site",
-								"X-Csrftoken": undefined,
-								"X-Ig-App-Id": undefined
-							},
-							responseType: "stream"
-						})
+					if(shouldDownloadStaticVideo){
+						const videoURL = item.video_versions[0].url
+						const videoFilename = GetURLFilename(videoURL)
+						const videoPath = join(folder, videoFilename)
 
-						await new Promise((resolve, reject) => {
-							file.on("close", async () => {
-								try{
-									utimes(path, date, date)
-									resolve(path)
-								}catch(error){
-									reject(error)
-								}
+						// Avoid multiple requests to download video
+						if(!(await exists(videoPath))){
+							const file = createWriteStream(videoPath)
+
+							/** @type {import("axios").AxiosResponse<import("stream").PassThrough>} */
+							const { data } = await Request(videoURL, "GET", {
+								headers: {
+									Accept: "*/*",
+									Priority: "u=1, i",
+									Cookie: undefined,
+									Pragma: "no-cache",
+									Referer: BASE_URL + "/",
+									"Cache-Control": "no-cache",
+									"Sec-Fetch-Dest": "empty",
+									"Sec-Fetch-Mode": "cors",
+									"Sec-Fetch-Site": "cross-site",
+									"X-Csrftoken": undefined,
+									"X-Ig-App-Id": undefined
+								},
+								responseType: "stream"
 							})
 
-							file.on("error", reject)
+							await new Promise((resolve, reject) => {
+								file.on("close", async () => {
+									try{
+										utimes(videoPath, date, date)
+										resolve(videoPath)
+									}catch(error){
+										reject(error)
+									}
+								})
 
-							data.pipe(file)
-						})
-					}
+								file.on("error", reject)
 
-					const ffmpegSimilarFramesProcess = spawn(ffmpegPath, [
-						"-i", "pipe:3",
-						"-vf", "mpdecimate",
-						"-f", "null",
-						"-"
-					], {
-						windowsHide: true,
-						stdio: [
-							"ignore", "pipe", "pipe",
-							"pipe"
-						]
-					})
-
-					/** @type {Buffer[]} */
-					const similarFramesChunks = []
-
-					ffmpegSimilarFramesProcess.stderr.on("data", chunk => similarFramesChunks.push(chunk))
-
-					createReadStream(path).pipe(/** @type {NodeJS.WritableStream} */ (ffmpegSimilarFramesProcess.stdio[3]))
-
-					ffmpegSimilarFramesProcess.on("close", code => {
-						if(code !== 0) return
-
-						const result = Buffer.concat(similarFramesChunks).toString().trim()
-						const similarFramesSize = +result.match(/frame=\s*(\d+)/)?.[1]
-
-						// Static video
-						if(similarFramesSize !== 0 && similarFramesSize < 5){
-							const ffmpegProcess = spawn(ffmpegPath, [
-								"-hide_banner",
-								"-loglevel", "error",
-								"-i", "pipe:3",
-								"-vf", "fps=1",
-								"-vcodec", "png",
-								"-f", "image2pipe",
-								"-threads", "4",
-								"pipe:4"
-							], {
-								windowsHide: true,
-								stdio: [
-									"ignore", "pipe", "pipe",
-									"pipe", "pipe"
-								]
-							})
-
-							/** @type {Buffer[]} */
-							const framesChunks = []
-
-							ffmpegProcess.stdio[4].on("data", chunk => framesChunks.push(chunk))
-
-							createReadStream(path).pipe(/** @type {NodeJS.WritableStream} */ (ffmpegProcess.stdio[3]))
-
-							ffmpegProcess.on("close", async code => {
-								if(code !== 0) return
-
-								const framesBuffer = Buffer.concat(framesChunks)
-								const frames = SplitPNGFrames(framesBuffer)
-									.sort((a, b) => b.byteLength - a.byteLength)
-
-								if(frames.length){
-									const { name } = parse(GetURLFilename(item.image_versions2.candidates[0].url))
-									const path = join(folder, `${name}.jpg`)
-
-									const image = await sharp(frames[0])
-										.jpeg({
-											force: true,
-											quality: 90,
-											progressive: true,
-											chromaSubsampling: "4:4:4"
-										})
-										.toBuffer()
-
-									await writeFile(path, image)
-									utimes(path, date, date)
-								}
+								data.pipe(file)
 							})
 						}
-					})
+
+						const ffmpegSimilarFramesProcess = spawn(ffmpegPath, [
+							"-i", "pipe:3",
+							"-vf", "mpdecimate",
+							"-f", "null",
+							"-"
+						], {
+							windowsHide: true,
+							stdio: [
+								"ignore", "pipe", "pipe",
+								"pipe"
+							]
+						})
+
+						/** @type {Buffer[]} */
+						const similarFramesChunks = []
+
+						ffmpegSimilarFramesProcess.stderr.on("data", chunk => similarFramesChunks.push(chunk))
+
+						createReadStream(videoPath).pipe(/** @type {NodeJS.WritableStream} */ (ffmpegSimilarFramesProcess.stdio[3]))
+
+						ffmpegSimilarFramesProcess.on("close", code => {
+							if(code !== 0) return
+
+							const result = Buffer.concat(similarFramesChunks).toString().trim()
+							const similarFramesSize = +result.match(/frame=\s*(\d+)/)?.[1]
+
+							// Static video
+							if(similarFramesSize !== 0 && similarFramesSize < 300){
+								const ffmpegProcess = spawn(ffmpegPath, [
+									"-hide_banner",
+									"-loglevel", "error",
+									"-i", "pipe:3",
+									"-vf", "fps=1",
+									"-vcodec", "png",
+									"-f", "image2pipe",
+									"pipe:4"
+								], {
+									windowsHide: true,
+									stdio: [
+										"ignore", "pipe", "pipe",
+										"pipe", "pipe"
+									]
+								})
+
+								/** @type {Buffer[]} */
+								const framesChunks = []
+
+								ffmpegProcess.stdio[4].on("data", chunk => framesChunks.push(chunk))
+
+								createReadStream(videoPath).pipe(/** @type {NodeJS.WritableStream} */ (ffmpegProcess.stdio[3]))
+
+								ffmpegProcess.on("close", async code => {
+									if(code !== 0) return
+
+									const framesBuffer = Buffer.concat(framesChunks)
+									const frames = SplitPNGFrames(framesBuffer)
+										.sort((a, b) => b.byteLength - a.byteLength)
+
+									if(frames.length){
+										const image = await sharp(frames[0])
+											.jpeg({
+												force: true,
+												quality: 90,
+												progressive: true,
+												chromaSubsampling: "4:4:4"
+											})
+											.toBuffer()
+
+										await writeFile(imagePath, image)
+										utimes(imagePath, date, date)
+									}
+								})
+							}
+						})
+					}
 				}catch(error){
 					Log(new Error("Failed to extract static video frame", { cause: error }))
 				}
 			}
 
 			if(withThumbs){
-				for(const url of [item.video_versions?.[0].url, item.image_versions2.candidates[0].url].filter(Boolean)){
+				for(const url of [
+					item.video_versions?.[0].url,
+					!shouldDownloadStaticVideo && item.image_versions2.candidates[0].url
+				].filter(Boolean)){
 					urls.set(url, date)
 					folders.set(url, folder)
 
@@ -1073,7 +1081,7 @@ export default class Downloader {
 	async Request(url, method = "GET", config = {}){
 		config.headers = {
 			...this.headers,
-			...(config.headers || {})
+			...config.headers
 		}
 
 		let _url
