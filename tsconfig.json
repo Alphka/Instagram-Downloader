@@ -12,12 +12,17 @@
 		"resolveJsonModule": true,
 		"skipLibCheck": false,
 		"incremental": true,
+		"types": ["node"],
 		"lib": ["ESNext"],
 		"noEmit": true
 	},
 	"include": [
 		"**/*.js",
+		"**/*.mjs",
+		"**/*.cjs",
 		"**/*.ts",
+		"**/*.mts",
+		"**/*.cts",
 		"tests/*.test.js"
 	],
 	"exclude": [

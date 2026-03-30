@@ -1,5 +1,5 @@
-import { BASE_URL, API_FACEBOOK_ACCOUNT, API_QUERY, API_REELS, API_GRAPHQL } from "./config.js"
 import { existsSync, readFileSync, writeFileSync, createWriteStream, createReadStream } from "fs"
+import { BASE_URL, API_FACEBOOK_ACCOUNT, API_QUERY, API_REELS, API_GRAPHQL } from "./config.js"
 import { mkdir, writeFile, utimes, access, constants } from "fs/promises"
 import { dirname, join, parse } from "path"
 import { fileURLToPath } from "url"
@@ -12,9 +12,9 @@ import SplitPNGFrames from "./helpers/SplitPNGFrames.js"
 import filenamify from "filenamify"
 import isNumber from "./helpers/isNumber.js"
 import dotenv from "dotenv"
+import axios from "axios"
 import Debug from "./helpers/Debug.js"
 import Queue from "./Queue.js"
-import axios from "axios"
 import sharp from "sharp"
 import which from "which"
 import mime from "mime"
@@ -779,15 +779,13 @@ export default class Downloader {
 				ffmpegPath = await which("ffmpeg", { nothrow: true })
 			}
 
-			let shouldDownloadStaticVideo = !!ffmpegPath && withThumbs && "video_versions" in item && item.video_versions && item.image_versions2.candidates[0].width === 640
+			const shouldDownloadStaticVideo = !!ffmpegPath && withThumbs && "video_versions" in item && item.video_versions && item.image_versions2.candidates[0].width === 640
 
 			if(shouldDownloadStaticVideo){
 				try{
 					const imagePath = join(folder, `${parse(GetURLFilename(item.image_versions2.candidates[0].url)).name}_static.jpg`)
 
-					shouldDownloadStaticVideo = !(await exists(imagePath))
-
-					if(shouldDownloadStaticVideo){
+					if(!(await exists(imagePath))){
 						const videoURL = item.video_versions[0].url
 						const videoFilename = GetURLFilename(videoURL)
 						const videoPath = join(folder, videoFilename)
