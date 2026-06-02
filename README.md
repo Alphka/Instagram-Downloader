@@ -5,6 +5,13 @@ A program written in JavaScript to download images and videos from Instagram.
 
 <hr>
 
+### Requirements
+
+- [Node.js](https://nodejs.org/en/download) (minimum v22.22)
+- [PNPM](https://pnpm.io/installation) (v10 or v11)
+
+<hr>
+
 ### Usage
 
 ```
@@ -34,7 +41,7 @@ Options:
   -nhc, --no-hcover     Disable highlights' cover download
   -d, --debug           Verbose output
   -fd, --flat-dir       Download all contents of the user in the same directory
-  -wt, --with-thumbs    Download thumbnails of videos
+  -wt, --with-thumbs    Download thumbnails of videos (requires ffmpeg for converting static videos into images)
   -h, --help            Display help
 ```
 

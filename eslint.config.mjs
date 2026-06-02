@@ -1,10 +1,10 @@
 import { defineConfig } from "eslint/config"
-import typescriptPlugin from "@typescript-eslint/eslint-plugin"
-import typescriptParser from "@typescript-eslint/parser"
 import unusedImports from "eslint-plugin-unused-imports"
 import regexPlugin from "eslint-plugin-regexp"
 import nodePlugin from "eslint-plugin-n"
 import stylistic from "@stylistic/eslint-plugin"
+import tseslint from "typescript-eslint"
+import unicorn from "eslint-plugin-unicorn"
 import globals from "globals"
 import sonar from "eslint-plugin-sonarjs"
 
@@ -20,37 +20,43 @@ export default defineConfig([
 		]
 	},
 	{
-		files: ["**/*.{js,cjs,mjs,jsx,ts,tsx,cts,mts}"],
-		...nodePlugin.configs["flat/recommended-script"]
+		name: "tseslint",
+		files: ["**/*.{js,cjs,mjs,ts,cts,mts}"],
+		extends: tseslint.configs.strictTypeChecked
 	},
 	{
-		files: ["**/*.{js,cjs,mjs,jsx,ts,tsx,cts,mts}"],
+		name: "node",
+		files: ["**/*.{js,cjs,mjs,ts,cts,mts}"],
+		...nodePlugin.configs["flat/recommended-module"]
+	},
+	{
+		name: "regexp",
+		files: ["**/*.{js,cjs,mjs,ts,cts,mts}"],
 		...regexPlugin.configs["flat/recommended"]
 	},
 	{
-		files: ["**/*.{ts,tsx,cts,mts,js,jsx,cjs,mjs}"],
+		files: ["**/*.{js,cjs,mjs,ts,cts,mts}"],
 		plugins: {
 			sonar,
+			unicorn,
 			"@stylistic": stylistic,
 			"unused-imports": unusedImports,
-			// @ts-ignore
-			"@typescript-eslint": typescriptPlugin
+			"@typescript-eslint": tseslint.plugin
 		},
 		languageOptions: {
-			ecmaVersion: 2022,
+			ecmaVersion: 2024,
 			globals: {
 				...globals.node
 			},
-			parser: typescriptParser,
+			parser: tseslint.parser,
 			parserOptions: {
-				ecmaFeatures: {
-					jsx: true
-				},
 				project: true
 			},
 			sourceType: "module"
 		},
 		rules: {
+			...unicorn.configs.unopinionated.rules,
+
 			"array-bracket-spacing": "off",
 			"array-callback-return": "error",
 			"arrow-spacing": "off",
@@ -115,7 +121,9 @@ export default defineConfig([
 			"no-lonely-if": "error",
 			"no-loss-of-precision": "error",
 			"no-misleading-character-class": "error",
-			"no-multi-assign": "off",
+			"no-multi-assign": ["error", {
+				ignoreNonDeclaration: true
+			}],
 			"no-multi-str": "error",
 			"no-multiple-empty-lines": "off",
 			"no-nested-ternary": "off",
@@ -155,7 +163,7 @@ export default defineConfig([
 			"no-useless-constructor": "error",
 			"no-useless-escape": "error",
 			"no-useless-return": "error",
-			"no-use-before-define": ["error", "nofunc"],
+			"no-use-before-define": "off",
 			"no-var": "error",
 			"no-with": "error",
 			"object-curly-spacing": "off",
@@ -182,10 +190,13 @@ export default defineConfig([
 			"valid-typeof": "error",
 			yoda: "error",
 
-			"n/no-missing-import": "off",
 			"n/no-unpublished-import": "off",
-			"n/no-unpublished-require": "off",
-			"n/no-unsupported-features/node-builtins": "off",
+			"n/no-unsupported-features/node-builtins": ["error", {
+				ignores: [
+					"import.meta.dirname",
+					"process.loadEnvFile"
+				]
+			}],
 
 			"regexp/no-useless-escape": "off",
 			"regexp/prefer-d": "off",
@@ -206,8 +217,8 @@ export default defineConfig([
 			"sonar/prefer-while": "warn",
 
 			"@stylistic/array-bracket-spacing": ["error", "never"],
-			"@stylistic/array-element-newline": "off",
-			"@stylistic/arrow-parens": ["error", "as-needed"],
+			"@stylistic/array-element-newline": ["error", "consistent"],
+			"@stylistic/arrow-parens": ["error", "always"],
 			"@stylistic/arrow-spacing": ["error", {
 				before: true,
 				after: true
@@ -253,7 +264,7 @@ export default defineConfig([
 					try: { after: false },
 					catch: { before: false, after: false },
 					finally: { before: false, after: false },
-					with: { before: false, after: false },
+					with: { before: true, after: true },
 					in: { before: true, after: true },
 					of: { before: true, after: true },
 					function: { after: false },
@@ -353,6 +364,11 @@ export default defineConfig([
 				words: true,
 				nonwords: false
 			}],
+			"@stylistic/spaced-comment": ["error", "always", {
+				block: {
+					balanced: true
+				}
+			}],
 			"@stylistic/switch-colon-spacing": ["error", {
 				after: true,
 				before: false
@@ -360,8 +376,8 @@ export default defineConfig([
 			"@stylistic/template-curly-spacing": ["error", "never"],
 			"@stylistic/template-tag-spacing": ["error", "never"],
 			"@stylistic/type-annotation-spacing": "error",
-			"@stylistic/type-generic-spacing": ["error"],
-			"@stylistic/type-named-tuple-spacing": ["error"],
+			"@stylistic/type-generic-spacing": "error",
+			"@stylistic/type-named-tuple-spacing": "error",
 			"@stylistic/yield-star-spacing": ["error", "after"],
 
 			"@typescript-eslint/ban-ts-comment": "off",
@@ -379,13 +395,19 @@ export default defineConfig([
 			"@typescript-eslint/lines-between-class-members": "off",
 			"@typescript-eslint/method-signature-style": ["error", "property"],
 			"@typescript-eslint/naming-convention": "off",
+			"@typescript-eslint/no-confusing-void-expression": "off",
 			"@typescript-eslint/no-duplicate-enum-values": "off",
 			"@typescript-eslint/no-empty-object-type": "off",
 			"@typescript-eslint/no-explicit-any": "off",
+			"@typescript-eslint/no-extraneous-class": "error",
+			"@typescript-eslint/no-floating-promises": "off",
 			"@typescript-eslint/no-import-type-side-effects": "error",
-			"@typescript-eslint/no-loop-func": "off",
-			"@typescript-eslint/no-redeclare": "off",
-			"@typescript-eslint/no-unnecessary-type-constraint": "off",
+			"@typescript-eslint/no-non-null-assertion": "off",
+			"@typescript-eslint/no-redeclare": "error",
+			"@typescript-eslint/no-unsafe-argument": "off",
+			"@typescript-eslint/no-unsafe-assignment": "off",
+			"@typescript-eslint/no-unsafe-member-access": "off",
+			"@typescript-eslint/no-unsafe-return": "off",
 			"@typescript-eslint/no-unused-expressions": "off",
 			"@typescript-eslint/no-unused-vars": ["error", {
 				args: "all",
@@ -397,7 +419,35 @@ export default defineConfig([
 				destructuredArrayIgnorePattern: "^_",
 				ignoreRestSiblings: true
 			}],
-			"@typescript-eslint/no-use-before-define": "off",
+			"@typescript-eslint/no-use-before-define": ["error", {
+				enums: true,
+				classes: true,
+				typedefs: true,
+				functions: false,
+				variables: true
+			}],
+			"@typescript-eslint/only-throw-error": "off",
+			"@typescript-eslint/restrict-plus-operands": "off",
+			"@typescript-eslint/restrict-template-expressions": "off",
+			"@typescript-eslint/unbound-method": "off",
+			"@typescript-eslint/use-unknown-in-catch-callback-variable": "off",
+
+			"@typescript-eslint/no-dynamic-delete": "off",
+			"@typescript-eslint/no-misused-promises": "off",
+			"@typescript-eslint/prefer-promise-reject-errors": "off",
+
+			"unicorn/import-style": ["error", {
+				styles: {
+					path: {
+						default: false
+					},
+					"node:path": {
+						default: false
+					}
+				}
+			}],
+			"unicorn/no-array-sort": "off",
+			"unicorn/prefer-string-slice": "off",
 
 			"unused-imports/no-unused-imports": "error"
 		}

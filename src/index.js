@@ -1,20 +1,16 @@
 #!/usr/bin/env node
 
-import { dirname, isAbsolute, join, relative, resolve } from "path"
-import { existsSync, mkdirSync, readFileSync } from "fs"
-import { fileURLToPath } from "url"
+import { isAbsolute, join, relative, resolve } from "node:path"
+import { existsSync, mkdirSync } from "node:fs"
 import { program } from "commander"
+import packageInfo from "../package.json" with { type: "json" }
 import Downloader from "./Downloader.js"
 import isNumber from "./helpers/isNumber.js"
 import config from "./config.js"
 import Log from "./helpers/Log.js"
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
-const root = join(__dirname, "..")
+const root = join(import.meta.dirname, "..")
 const cwd = process.cwd()
-
-const packageInfo = /** @type {import("../package.json")} */ (JSON.parse(readFileSync(join(root, "package.json"), "utf8")))
 
 /**
  * @param {string | undefined} directory
@@ -44,7 +40,7 @@ function GetOutputDirectory(directory, force){
 }
 
 const command = program
-	.name(packageInfo.bin && Object.keys(packageInfo.bin)[0] || packageInfo.name)
+	.name(Object.keys(packageInfo.bin)[0] || packageInfo.name)
 	.version(packageInfo.version, "-v, --version", "Display program version")
 	.description(packageInfo.description)
 	.argument(config.argument.name, config.argument.description)
@@ -84,12 +80,13 @@ const command = program
 			}
 		})
 
-config.options.forEach(({ option, alternative, description, defaultValue, syntax }) => {
+for(const { option, alternative, description, defaultValue, syntax } of config.options){
 	let flags = ""
 
 	if(alternative){
-		if(Array.isArray(alternative)) flags += alternative.map(command => "-" + command).join(", ")
-		else flags += "-" + alternative
+		flags += Array.isArray(alternative)
+			? alternative.map((command) => "-" + command).join(", ")
+			: `-${alternative}`
 
 		if(option) flags += ", "
 	}
@@ -99,6 +96,6 @@ config.options.forEach(({ option, alternative, description, defaultValue, syntax
 
 	// @ts-ignore
 	command.option(flags, description, defaultValue)
-})
+}
 
 command.parse()

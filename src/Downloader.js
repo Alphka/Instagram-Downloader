@@ -1,18 +1,18 @@
-import { existsSync, readFileSync, writeFileSync, createWriteStream, createReadStream } from "fs"
+import { existsSync, readFileSync, writeFileSync, createWriteStream, createReadStream } from "node:fs"
 import { BASE_URL, API_FACEBOOK_ACCOUNT, API_QUERY, API_REELS, API_GRAPHQL } from "./config.js"
-import { mkdir, writeFile, utimes, access, constants } from "fs/promises"
-import { dirname, join, parse } from "path"
-import { fileURLToPath } from "url"
+import { mkdir, writeFile, utimes, access, constants } from "node:fs/promises"
+import { join, parse } from "node:path"
+import { Agent } from "node:https"
 import { spawn } from "cross-spawn"
+import axios, { AxiosHeaders } from "axios"
 import GetCorrectContent from "./helpers/GetCorrectContent.js"
 import ValidateUsername from "./helpers/ValidateUsername.js"
 import FindRegexArray from "./helpers/FindRegexArray.js"
 import GetURLFilename from "./helpers/GetURLFilename.js"
 import SplitPNGFrames from "./helpers/SplitPNGFrames.js"
+import IsAbsoluteURL from "./helpers/IsAbsoluteURL.js"
 import filenamify from "filenamify"
 import isNumber from "./helpers/isNumber.js"
-import dotenv from "dotenv"
-import axios from "axios"
 import Debug from "./helpers/Debug.js"
 import Queue from "./Queue.js"
 import sharp from "sharp"
@@ -20,21 +20,47 @@ import which from "which"
 import mime from "mime"
 import Log from "./helpers/Log.js"
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
+/** @type {import("axios").AxiosInstance & { enableRequestLogs?: boolean }} */
+const api = axios.create({
+	baseURL: BASE_URL,
+	httpsAgent: new Agent({
+		rejectUnauthorized: false
+	}),
+	allowAbsoluteUrls: true
+})
 
-const root = join(__dirname, "..")
+api.interceptors.request.use((request) => {
+	if(api.enableRequestLogs){
+		Debug(`Starting request: ${request.url}`)
+	}
+
+	const isAbsoluteURL = request.url ? IsAbsoluteURL(request.url) : false
+
+	if(isAbsoluteURL){
+		const url = new URL(/** @type {string} */ (request.url))
+
+		if(!request.headers.has("Host")) request.headers.set("Host", url.host)
+		if(!request.headers.has("Origin")) request.headers.set("Origin", url.origin)
+	}else{
+		if(!request.headers.has("Host")) request.headers.set("Host", BASE_URL.replace(/^https?:\/\//, ""))
+		if(!request.headers.has("Origin")) request.headers.set("Origin", BASE_URL)
+	}
+
+	return request
+})
+
+const root = join(import.meta.dirname, "..")
 const configPath = join(root, "config.json")
 
 const isTesting = process.env.npm_command === "test" || process.env.npm_lifecycle_event === "test"
 
-Object.assign(axios.defaults.headers.common, {
-	"Accept-Encoding": "gzip, deflate, br",
+api.defaults.headers.common = {
+	Accept: "*/*",
 	"Accept-Language": "en-US,en;q=0.9",
 	Dnt: "1",
 	"Sec-Ch-Prefers-Color-Scheme": "dark",
-	"Sec-Ch-Ua": '"Google Chrome";v="143", "Chromium";v="143", "Not A(Brand";v="24"',
-	"Sec-Ch-Ua-Full-Version-List": '"Google Chrome";v="143.0.7499.193", "Chromium";v="143.0.7499.193", "Not A(Brand";v="24.0.0.0"',
+	"Sec-Ch-Ua": '"Chromium";v="148", "Google Chrome";v="148", "Not/A)Brand";v="99"',
+	"Sec-Ch-Ua-Full-Version-List": '"Chromium";v="148.0.7778.179", "Google Chrome";v="148.0.7778.179", "Not/A)Brand";v="99.0.0.0"',
 	"Sec-Ch-Ua-Mobile": "?0",
 	"Sec-Ch-Ua-Model": '""',
 	"Sec-Ch-Ua-Platform": '"Windows"',
@@ -42,12 +68,12 @@ Object.assign(axios.defaults.headers.common, {
 	"Sec-Fetch-Dest": "empty",
 	"Sec-Fetch-Mode": "cors",
 	"Upgrade-Insecure-Requests": "1",
-	"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
-})
+	"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
+}
 
-Object.assign(axios.defaults.headers.get, {
+api.defaults.headers.get = {
 	"Viewport-Width": "1920"
-})
+}
 
 const userIdRegexArray = [
 	/\{"id":"(\d+)","profile_pic_url"/,
@@ -59,7 +85,7 @@ const userIdRegexArray = [
 
 /** @param {import("fs").PathLike} path */
 async function exists(path){
-	return new Promise(resolve => {
+	return new Promise((resolve) => {
 		access(path, constants.F_OK)
 			.then(() => resolve(true))
 			.catch(() => resolve(false))
@@ -67,10 +93,7 @@ async function exists(path){
 }
 
 export default class Downloader {
-	/** @type {import("./typings/api.js").APIHeaders} */ headers = {
-		Accept: "*/*",
-		Origin: BASE_URL
-	}
+	/** @type {Record<string, string>} */ headers = {}
 
 	/** @type {string} */ output
 	/** @type {string[]} */ usernames
@@ -120,13 +143,13 @@ export default class Downloader {
 
 			if(COOKIES){
 				try{
-					const object = JSON.parse(COOKIES)
+					const result = JSON.parse(COOKIES)
 
-					if(!object || typeof object !== "object"){
+					if(!result || typeof result !== "object"){
 						throw new TypeError("The configuration value is not an object")
 					}
 
-					envCookiesObject = object
+					envCookiesObject = /** @type {Record<string, string>} */ (result)
 				}catch(cause){
 					Log(new Error("Error parsing COOKIES environment variable", { cause }))
 				}
@@ -135,9 +158,9 @@ export default class Downloader {
 			this.config = {
 				cookie: {
 					...envCookiesObject,
-					csrftoken: TOKEN,
-					ds_user_id: USER_ID,
-					sessionid: SESSION_ID
+					csrftoken: /** @type {string} */ (TOKEN),
+					ds_user_id: /** @type {string} */ (USER_ID),
+					sessionid: /** @type {string} */ (SESSION_ID)
 				}
 			}
 
@@ -146,11 +169,19 @@ export default class Downloader {
 			return this.config
 		}
 
-		/** @type {import("./typings/index.d.ts").Config} */
-		const config = this.config = JSON.parse(readFileSync(configPath, "utf8"))
+		let data = readFileSync(configPath, "utf8")
 
+		if(!data.trim()) data = "{}"
+
+		const config = /** @type {import("./typings/index.d.ts").Config} */ (JSON.parse(data))
+
+		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 		if(!config || typeof config !== "object") throw new TypeError("Invalid type from config.json")
+
+		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 		if(!config.cookie) config.cookie = {}
+
+		this.config = config
 
 		this.UpdateHeaders()
 
@@ -181,10 +212,10 @@ export default class Downloader {
 		if(isTesting || this.isEnvSet) return
 
 		const { config } = this
-		const envPath = join(root, ".env")
+		const environmentPath = join(root, ".env")
 
-		if(existsSync(envPath)){
-			dotenv.config({ path: envPath })
+		if(existsSync(environmentPath)){
+			process.loadEnvFile(environmentPath)
 		}
 
 		const data = {
@@ -199,20 +230,35 @@ export default class Downloader {
 
 		this.UpdateHeaders()
 
-		const envString = Object.entries(data).map(([key, value]) => {
-			// eslint-disable-next-line array-callback-return
-			if(!value) return
-			return `${key}=${value}`
-		}).filter(Boolean).join("\n") + "\n"
+		let environmentContent = existsSync(environmentPath) ? readFileSync(environmentPath, "utf8") : ""
+
+		for(const [key, value] of Object.entries(data)){
+			if(!value) continue
+
+			const environmentVariablePattern = new RegExp(String.raw`^(\s*${key}\s*=).*$`, "m")
+
+			if(environmentVariablePattern.test(environmentContent)){
+				environmentContent = environmentContent.replace(environmentVariablePattern, `$1${value}`)
+			}else{
+				if(environmentContent !== "" && !environmentContent.endsWith("\n")){
+					environmentContent += "\n"
+				}
+
+				environmentContent += `${key}=${value}\n`
+			}
+		}
 
 		this.isEnvSet = true
 
-		if(sync) writeFileSync(envPath, envString, "utf8")
-		else return writeFile(envPath, envString, "utf8")
+		if(sync) writeFileSync(environmentPath, environmentContent, "utf8")
+		else return writeFile(environmentPath, environmentContent, "utf8")
 	}
 	UpdateHeaders(){
 		const { headers, config } = this
+
+		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 		const { app_id, cookie } = config || {}
+
 		const token = cookie.csrftoken
 
 		if(token) headers["X-Csrftoken"] = cookie.csrftoken
@@ -231,7 +277,7 @@ export default class Downloader {
 	 * 	| "output"
 	 * 	| "debug"
 	 * 	| "limit"
-	 * >} data
+	 * > & Required<Pick<import("./typings/index.d.ts").Options, "output">>} data
 	 */
 	async Init({
 		highlights,
@@ -249,6 +295,8 @@ export default class Downloader {
 		this.debug = debug
 		this.flatDir = flatDir
 		this.withThumbs = withThumbs
+
+		api.enableRequestLogs = debug
 
 		if(isNumber(limit)) this.limit = Number(limit)
 
@@ -302,7 +350,7 @@ export default class Downloader {
 
 				const { is_private, friendship_status: { following } } = await this.GetUser(userId, username)
 					// Make the GetUser call non fatal
-					.catch(error => {
+					.catch((error) => {
 						if(this.debug) Debug("GetUser error:", error)
 						return { is_private: false, friendship_status: { following: false } }
 					})
@@ -346,15 +394,17 @@ export default class Downloader {
 	}
 	async CheckLogin(){
 		/** @type {import("axios").AxiosResponse<import("./typings/api.js").FacebookAccountAPIResponse>} */
-		const response = await this.Request(new URL(API_FACEBOOK_ACCOUNT, BASE_URL), "POST", {
-			headers: { Referer: BASE_URL + "/" },
+		const response = await this.Request(API_FACEBOOK_ACCOUNT, "POST", {
+			headers: {
+				Referer: BASE_URL + "/"
+			},
 			responseType: "json",
 			maxRedirects: 0
 		})
 
-		if(this.debug) Debug("CheckLogin:", typeof response?.data, response?.data)
+		if(this.debug) Debug("CheckLogin:", typeof response.data, response.data)
 
-		if(typeof response?.data === "object" && "status" in response.data){
+		if(typeof response.data === "object" && "status" in response.data){
 			const { status, message } = response.data
 			if(status === "ok") return
 			if(message) throw new Error(`User is not logged in: ${message}`)
@@ -367,15 +417,13 @@ export default class Downloader {
 	 * @param {string} [username]
 	 */
 	async GetUser(userId, username){
+		const { fb_dtsg } = this.config
+
 		/** @type {import("axios").AxiosResponse<import("./typings/api.js").QueryUserAPIResponse>} */
-		const response = await this.Request(new URL(API_GRAPHQL, BASE_URL), "POST", {
+		const response = await this.Request(API_GRAPHQL, "POST", {
 			data: new URLSearchParams({
-				__d: "www",
-				__user: "0",
-				__a: "1",
-				__ccg: "EXCELLENT",
-				__crn: "comet.igweb.PolarisProfilePostsTabRoute",
 				dpr: "1",
+				fb_dtsg: /** @type {string} */ (fb_dtsg),
 				fb_api_caller_class: "RelayModern",
 				fb_api_req_friendly_name: "PolarisProfilePageContentQuery",
 				variables: JSON.stringify({
@@ -383,7 +431,7 @@ export default class Downloader {
 					render_surface: "PROFILE"
 				}),
 				server_timestamps: "true",
-				doc_id: "9916454141777118"
+				doc_id: "26947072594934194"
 			}),
 			headers: {
 				Accept: "*/*",
@@ -395,7 +443,7 @@ export default class Downloader {
 			responseType: "json"
 		})
 
-		if(typeof response?.data === "object"){
+		if(typeof response.data === "object"){
 			const { data } = response.data
 
 			if(data && "user" in data) return data.user
@@ -407,7 +455,7 @@ export default class Downloader {
 	}
 	/** @param {string} username */
 	GetUserProfileLink(username){
-		return `${BASE_URL}/${username}/`
+		return /** @type {const} */ (`/${username}/`)
 	}
 	/** @param {string} username */
 	async GetUserId(username){
@@ -445,7 +493,7 @@ export default class Downloader {
 	 */
 	async GetTimeline(username, after, count = 12){
 		/** @type {import("axios").AxiosResponse<import("./typings/api.js").QueryTimelineAPIResponse>} */
-		const response = await this.Request(new URL(API_QUERY, BASE_URL), "POST", {
+		const response = await this.Request(API_QUERY, "POST", {
 			data: new URLSearchParams({
 				variables: JSON.stringify({
 					data: {
@@ -489,37 +537,36 @@ export default class Downloader {
 	 */
 	async GetHighlights(user_id, username){
 		const { config } = this
+		const { fb_dtsg } = config
 
 		/** @type {import("axios").AxiosResponse<import("./typings/api.js").QueryHighlightsAPIResponse>} */
-		const response = await this.Request(new URL(API_QUERY, BASE_URL), "POST", {
+		const response = await this.Request(API_QUERY, "POST", {
 			data: new URLSearchParams({
-				variables: JSON.stringify({ user_id }),
-				server_timestamps: "true",
+				dpr: "1",
+				fb_dtsg: /** @type {string} */ (fb_dtsg),
 				fb_api_caller_class: "RelayModern",
 				fb_api_req_friendly_name: "PolarisProfileStoryHighlightsTrayContentQuery",
-				doc_id: "9814547265267853"
+				variables: JSON.stringify({ user_id }),
+				server_timestamps: "true",
+				doc_id: "36997000523232338"
 			}),
 			headers: {
 				Accept: "*/*",
 				Priority: "u=1, i",
 				Referer: username ? this.GetUserProfileLink(username) : BASE_URL + "/",
 				"Content-Type": "application/x-www-form-urlencoded",
-				"X-Fb-Friendly-Name": "PolarisProfileStoryHighlightsTrayContentQuery",
-				"X-Root-Field-Name": "xdt_api__v1__user_id__paginated_highlights_tray_connection"
+				"Sec-Fetch-Dest": "empty",
+				"Sec-Fetch-Mode": "cors",
+				"Sec-Fetch-Site": "same-origin",
+				"X-Fb-Friendly-Name": "PolarisProfileStoryHighlightsTrayContentQuery"
 			},
 			responseType: "json"
 		})
 
 		try{
 			const { cookie: { sessionid } } = config
-			const { vary } = response.headers
 
-			if(
-				!vary ||
-				!sessionid ||
-				sessionid === '""' ||
-				!vary.includes("Cookie")
-			){
+			if(!sessionid || sessionid === '""'){
 				throw "GetHighlights: Unauthenticated or login session expired"
 			}
 
@@ -545,7 +592,7 @@ export default class Downloader {
 		 * 	| import("./typings/api.js").GraphAPIResponseError
 		 * >
 		 * } */
-		const response = await this.Request(new URL(API_QUERY, BASE_URL), "POST", {
+		const response = await this.Request(API_QUERY, "POST", {
 			data: new URLSearchParams({
 				variables: JSON.stringify({
 					after: null,
@@ -567,8 +614,8 @@ export default class Downloader {
 
 		if(!feed){
 			const { errors } = /** @type {import("./typings/api.js").GraphAPIResponseError} */ (response.data)
-			const error = errors?.[0]
-			throw new Error(`Error downloading highlights ${error ? `(${error.severity}): ${error.message}` : ""}`)
+
+			throw new Error(`Error downloading highlights (${errors[0].severity})`)
 		}
 
 		if(this.debug) Debug("GetHighlightsContents:", JSON.stringify(feed, undefined, 2))
@@ -580,17 +627,18 @@ export default class Downloader {
 	 * @param {string} [username]
 	 */
 	async GetStories(userId, username){
-		const url = new URL(API_REELS, BASE_URL)
-
-		url.searchParams.set("reel_ids", userId)
-
 		/** @type {import("axios").AxiosResponse<import("./typings/api.js").StoriesAPIResponse>} */
-		const response = await this.Request(url, "GET", {
-			headers: { Referer: username ? this.GetUserProfileLink(username) : BASE_URL + "/" },
+		const response = await this.Request(API_REELS, "GET", {
+			params: {
+				reel_ids: userId
+			},
+			headers: {
+				Referer: username ? this.GetUserProfileLink(username) : BASE_URL + "/"
+			},
 			responseType: "json"
 		})
 
-		if(typeof response?.data === "object"){
+		if(typeof response.data === "object"){
 			const { reels, reels_media } = response.data
 
 			if(this.debug) Debug("GetStories:", JSON.stringify(response.data, undefined, 2))
@@ -610,7 +658,7 @@ export default class Downloader {
 	async DownloadHighlights(user_id, folder, hcover, limit = Infinity, username){
 		const highlights = await this.GetHighlights(user_id, username)
 
-		const highlightsMap = new Map(highlights.map(reel => [reel.id, reel]))
+		const highlightsMap = new Map(highlights.map((reel) => [reel.id, reel]))
 
 		let hasHighlights = Boolean(highlights.length)
 		let count = 0
@@ -619,6 +667,7 @@ export default class Downloader {
 			const ids = highlights.splice(0, 10).map(({ id }) => id)
 			const highlightsContents = await this.GetHighlightsContents(ids, username)
 
+			// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 			if(!highlightsContents) throw new Error("No highlights found. The request might have been forbidden")
 
 			if(!highlightsContents.length){
@@ -631,22 +680,22 @@ export default class Downloader {
 
 				Log(`Downloading highlight: '${title}' (${id.substring(id.indexOf(":") + 1)})`)
 
-				const target_dir = this.flatDir ? folder : join(folder, "highlights", filenamify(title))
+				const targetDir = this.flatDir ? folder : join(folder, "highlights", filenamify(title))
 
 				if(items.length){
-					await mkdir(target_dir, { recursive: true })
+					await mkdir(targetDir, { recursive: true })
 				}
 
 				const shouldDownloadCover = hcover && highlightsMap.has(id)
 				let coverUrl
 
 				if(shouldDownloadCover){
-					const { cropped_image_version: { url } } = highlightsMap.get(id).cover_media
+					const { cropped_image_version: { url } } = /** @type {typeof highlights[number]} */ (highlightsMap.get(id)).cover_media
 					coverUrl = url
 				}
 
 				const data = { count, limit }
-				const { urls, limited } = await this.DownloadItems(items, target_dir, data, username)
+				const { urls, limited } = await this.DownloadItems(items, targetDir, data, username)
 
 				count = data.count
 
@@ -659,7 +708,7 @@ export default class Downloader {
 						count++
 
 						try{
-							await this.Download(coverUrl, target_dir, new Date)
+							await this.Download(coverUrl, targetDir, new Date)
 						}catch(error){
 							Log(error)
 						}
@@ -675,30 +724,32 @@ export default class Downloader {
 		}else Log("No highlights found")
 	}
 	/**
-	 * @param {string} user_id
+	 * @param {string} userId
 	 * @param {string} folder
 	 * @param {number} [limit]
 	 * @param {string} [username]
 	 */
-	async DownloadStories(user_id, folder, limit = Infinity, username){
-		const results = await this.GetStories(/** @type {`${number}`} */ (user_id), username)
+	async DownloadStories(userId, folder, limit = Infinity, username){
+		const results = await this.GetStories(/** @type {`${number}`} */ (userId), username)
 
+		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 		if(!results?.items?.length) return Log("No stories found")
 
 		const { items: stories } = results
 
 		Log("Downloading stories")
 
-		const target_dir = this.flatDir ? folder : join(folder, "stories")
+		const targetDir = this.flatDir ? folder : join(folder, "stories")
 
-		await mkdir(target_dir, { recursive: true })
+		await mkdir(targetDir, { recursive: true })
 
 		let count = 0
 
 		while(stories.length && limit > count){
 			const items = stories.splice(0, 10)
 			const data = { count, limit }
-			const { limited } = await this.DownloadItems(items, target_dir, data, username)
+
+			const { limited } = await this.DownloadItems(items, targetDir, data, username)
 
 			count = data.count
 
@@ -727,12 +778,12 @@ export default class Downloader {
 				else break
 			}
 
-			const target_dir = this.flatDir ? folder : join(folder, "timeline")
+			const targetDir = this.flatDir ? folder : join(folder, "timeline")
 
-			await mkdir(target_dir, { recursive: true })
+			await mkdir(targetDir, { recursive: true })
 
 			const data = { count, limit }
-			const { limited } = await this.DownloadItems(edges.map(({ node }) => node), target_dir, data, username)
+			const { limited } = await this.DownloadItems(edges.map(({ node }) => node), targetDir, data, username)
 
 			count = data.count
 
@@ -752,13 +803,16 @@ export default class Downloader {
 	 */
 	async DownloadItems(items, folder, data, _username){
 		const { withThumbs } = this
-		const Request = this.Request.bind(this)
 
 		/** @type {Map<string, Date>} */
 		const urls = new Map
+
+		/** @type {Map<string, string>} */
 		const folders = new Map
 
 		const shouldLimit = data && typeof data.limit === "number"
+
+		/** @type {boolean} */
 		let limited = false
 
 		if(shouldLimit && !data.limit) return {
@@ -774,7 +828,7 @@ export default class Downloader {
 		 * @param {Date} date
 		 * @param {string} folder
 		 */
-		async function QueueItemContentDownload(item, date, folder){
+		const QueueItemContentDownload = async (item, date, folder) => {
 			if(ffmpegPath === undefined){
 				ffmpegPath = await which("ffmpeg", { nothrow: true })
 			}
@@ -786,7 +840,7 @@ export default class Downloader {
 					const imagePath = join(folder, `${parse(GetURLFilename(item.image_versions2.candidates[0].url)).name}_static.jpg`)
 
 					if(!(await exists(imagePath))){
-						const videoURL = item.video_versions[0].url
+						const videoURL = /** @type {import("./typings/api.js").VideoVersion[]} */ (item.video_versions)[0].url
 						const videoFilename = GetURLFilename(videoURL)
 						const videoPath = join(folder, videoFilename)
 
@@ -795,7 +849,7 @@ export default class Downloader {
 							const file = createWriteStream(videoPath)
 
 							/** @type {import("axios").AxiosResponse<import("stream").PassThrough>} */
-							const { data } = await Request(videoURL, "GET", {
+							const { data } = await this.Request(videoURL, "GET", {
 								headers: {
 									Accept: "*/*",
 									Priority: "u=1, i",
@@ -815,7 +869,7 @@ export default class Downloader {
 							await new Promise((resolve, reject) => {
 								file.on("close", async () => {
 									try{
-										utimes(videoPath, date, date)
+										await utimes(videoPath, date, date)
 										resolve(videoPath)
 									}catch(error){
 										reject(error)
@@ -828,58 +882,70 @@ export default class Downloader {
 							})
 						}
 
-						const ffmpegSimilarFramesProcess = spawn(ffmpegPath, [
-							"-i", "pipe:3",
-							"-vf", "mpdecimate",
-							"-f", "null",
+						const ffmpegSimilarFramesProcess = spawn(/** @type {string} */ (ffmpegPath), [
+							"-i",
+							"pipe:3",
+							"-vf",
+							"mpdecimate",
+							"-f",
+							"null",
 							"-"
 						], {
 							windowsHide: true,
 							stdio: [
+								/* eslint-disable @stylistic/array-element-newline */
 								"ignore", "pipe", "pipe",
 								"pipe"
+								/* eslint-enable @stylistic/array-element-newline */
 							]
 						})
 
 						/** @type {Buffer[]} */
-						const similarFramesChunks = []
+						const similarFramesChunks = [];
 
-						ffmpegSimilarFramesProcess.stderr.on("data", chunk => similarFramesChunks.push(chunk))
+						/** @type {import("stream").Readable} */ (ffmpegSimilarFramesProcess.stderr).on("data", (chunk) => similarFramesChunks.push(chunk))
 
 						createReadStream(videoPath).pipe(/** @type {NodeJS.WritableStream} */ (ffmpegSimilarFramesProcess.stdio[3]))
 
-						ffmpegSimilarFramesProcess.on("close", code => {
+						ffmpegSimilarFramesProcess.on("close", (code) => {
 							if(code !== 0) return
 
 							const result = Buffer.concat(similarFramesChunks).toString().trim()
-							const similarFramesSize = +result.match(/frame=\s*(\d+)/)?.[1]
+							const similarFramesSize = Number(/** @type {RegExpMatchArray} */ (result.match(/frame=\s*(\d+)/))[1])
 
 							// Static video
 							if(similarFramesSize !== 0 && similarFramesSize < 300){
-								const ffmpegProcess = spawn(ffmpegPath, [
+								const ffmpegProcess = spawn(/** @type {string} */ (ffmpegPath), [
 									"-hide_banner",
-									"-loglevel", "error",
-									"-i", "pipe:3",
-									"-vf", "fps=1",
-									"-vcodec", "png",
-									"-f", "image2pipe",
+									"-loglevel",
+									"error",
+									"-i",
+									"pipe:3",
+									"-vf",
+									"fps=1",
+									"-vcodec",
+									"png",
+									"-f",
+									"image2pipe",
 									"pipe:4"
 								], {
 									windowsHide: true,
 									stdio: [
+										/* eslint-disable @stylistic/array-element-newline */
 										"ignore", "pipe", "pipe",
 										"pipe", "pipe"
+										/* eslint-enable @stylistic/array-element-newline */
 									]
 								})
 
 								/** @type {Buffer[]} */
-								const framesChunks = []
+								const framesChunks = [];
 
-								ffmpegProcess.stdio[4].on("data", chunk => framesChunks.push(chunk))
+								/** @type {import("stream").Readable} */ (ffmpegProcess.stdio[4]).on("data", (chunk) => framesChunks.push(chunk))
 
 								createReadStream(videoPath).pipe(/** @type {NodeJS.WritableStream} */ (ffmpegProcess.stdio[3]))
 
-								ffmpegProcess.on("close", async code => {
+								ffmpegProcess.on("close", async (code) => {
 									if(code !== 0) return
 
 									const framesBuffer = Buffer.concat(framesChunks)
@@ -908,33 +974,24 @@ export default class Downloader {
 				}
 			}
 
-			if(withThumbs){
-				for(const url of [
-					item.video_versions?.[0].url,
-					!shouldDownloadStaticVideo && item.image_versions2.candidates[0].url
-				].filter(Boolean)){
-					urls.set(url, date)
-					folders.set(url, folder)
-
-					data.count++
-				}
-			}else{
-				const { url } = GetCorrectContent(item)[0]
-
+			for(const url of [
+				GetCorrectContent(item)[0].url,
+				withThumbs && !shouldDownloadStaticVideo && item.video_versions?.[0] && item.image_versions2.candidates[0].url
+			].filter(Boolean)){
 				urls.set(url, date)
 				folders.set(url, folder)
 
-				data.count++
+				if(data) data.count++
 			}
 		}
 
 		/**
-		 * @param {typeof items[number]} item
+		 * @param {NonNullable<import("./typings/api.js").FeedItem["carousel_media"]>} carousel_media
 		 * @param {Date} date
 		 * @param {string} folder
 		 */
-		async function QueueCarouselDownload(item, date, folder){
-			for(const media of item.carousel_media){
+		async function QueueCarouselDownload(carousel_media, date, folder){
+			for(const media of carousel_media){
 				if(shouldLimit && data.count >= data.limit){
 					limited = true
 					break
@@ -955,12 +1012,15 @@ export default class Downloader {
 			if(item.carousel_media_count){
 				const target_dir = this.flatDir ? folder : join(folder, "carousel", item.pk)
 
-				if(item.carousel_media.length){
+				const carousel_media = /** @type {NonNullable<typeof item.carousel_media>} */ (item.carousel_media)
+
+				if(carousel_media.length){
 					await mkdir(target_dir, { recursive: true })
 				}
 
-				await QueueCarouselDownload(item, date, target_dir)
+				await QueueCarouselDownload(carousel_media, date, target_dir)
 
+				// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 				if(limited) break
 
 				continue
@@ -1026,11 +1086,14 @@ export default class Downloader {
 			return path
 		}
 
-		if(/^image\/.+$/.test(mime.getType(ext))) return this.queue.add(async () => {
+		const mimeType = mime.getType(ext)
+
+		if(mimeType && /^image\/.+$/.test(mimeType)) return this.queue.add(async () => {
 			Object.assign(config, { responseType: "arraybuffer" })
 
 			/** @type {import("axios").AxiosResponse<Buffer>} */
-			const { data, status } = await this.Request(url, "GET", config)
+			const response = await this.Request(url, "GET", config)
+			const { data, status } = response
 
 			if(status < 200 || status >= 300){
 				Log(new Error(`Request to media ${filename} failed with status ${status}`))
@@ -1058,7 +1121,7 @@ export default class Downloader {
 
 				file.on("close", async () => {
 					try{
-						utimes(path, date, date)
+						await utimes(path, date, date)
 						resolve(path)
 					}catch(error){
 						reject(error)
@@ -1072,56 +1135,53 @@ export default class Downloader {
 	}
 	/**
 	 * @template T
-	 * @param {string | URL} url
+	 * @param {string} url
 	 * @param {"GET" | "POST"} [method]
 	 * @param {Omit<import("axios").AxiosRequestConfig, "url" | "method">} [config]
 	 */
 	async Request(url, method = "GET", config = {}){
-		config.headers = {
-			...this.headers,
-			...config.headers
+		const headers = AxiosHeaders.from(this.headers)
+
+		if(config.headers){
+			if(config.headers instanceof AxiosHeaders){
+				for(const [key, value] of Object.entries(config.headers.toJSON())){
+					headers.set(key, value)
+				}
+			}else{
+				for(const [key, value] of Object.entries(config.headers)){
+					if(value !== null && value !== undefined && typeof value !== "object"){
+						headers.set(key, String(value))
+					}
+				}
+			}
 		}
-
-		let _url
-
-		if(url instanceof URL){
-			_url = url
-			url = url.href
-		}else{
-			_url = new URL(url)
-		}
-
-		config.headers = {
-			Host: _url.host,
-			Origin: _url.origin,
-			"Sec-Fetch-Site": BASE_URL === _url.origin ? "same-origin" : "cross-site",
-			...config.headers
-		}
-
-		Object.entries(config.headers).forEach(([key, value]) => {
-			if(value === undefined) delete config.headers[key]
-		})
 
 		try{
 			/** @type {import("axios").AxiosResponse<T>} */
-			const response = await axios({
+			const response = await api({
 				url,
 				method,
 				validateStatus: () => true,
-				...config
+				...config,
+				headers
 			})
 
-			if(!this.config) this.SetConfig()
+			// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+			if(!this.config){
+				this.SetConfig()
+			}
 
-			response?.headers["set-cookie"]?.forEach(cookieConfig => {
+			for(const cookieConfig of /** @type {import("axios").AxiosResponseHeaders} */ (response.headers).getSetCookie()){
 				const [key, ...values] = cookieConfig.split(";")[0].split("=")
 
-				if(key === "th_eu_pref") return
+				if(key === "th_eu_pref"){
+					continue
+				}
 
 				const value = encodeURIComponent(values.join("="))
 
 				this.config.cookie[key] = value
-			})
+			}
 
 			await this.WriteConfig()
 
@@ -1133,18 +1193,24 @@ export default class Downloader {
 	async CheckServerConfig(){
 		const { config } = this
 
-		if(config.app_id) return
+		const response = await this.Request("/", "GET", { responseType: "text" })
 
-		const response = await this.Request(new URL("/", BASE_URL), "GET", { responseType: "text" })
+		if(typeof response.data === "string"){
+			const appId = response.data.match(/"X-IG-App-ID":"(\d+)"/)?.[1]
 
-		if(typeof response?.data === "string"){
-			try{
-				const appId = response.data.match(/"X-IG-App-ID":"(\d+)"/)?.[1]
-				if(!appId) throw "App ID was not found"
-
+			if(appId){
 				config.app_id = appId
-			}catch(error){
-				Log(new Error("Failed to set App ID", { cause: error }))
+			}else if(isTesting || !config.app_id){
+				throw new Error("App ID was not found")
+			}
+
+			const fbDtsg = response.data.match(/"DTSGInitData",\[\],\{"token":"([-\w:]+)"/)?.[1]
+			// /(?:(?:"DTSGInit(?:ial)?Data",\[\],|"dtsg":)\{"token":"|"s":"XPolarisProfileController","w":\d+,"f":")([-\w:]+)"/
+
+			if(fbDtsg){
+				config.fb_dtsg = fbDtsg
+			}else if(isTesting || !config.fb_dtsg){
+				throw new Error("fb_dtsg was not found")
 			}
 
 			this.UpdateHeaders()

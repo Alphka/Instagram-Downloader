@@ -14,7 +14,10 @@ export default function Log(...args){
 		const arg = args[0]
 
 		if(arg instanceof Error){
-			const message = arg.cause ? `${arg.message} (${arg.cause})` : arg.message
+			const message = arg.cause
+				? `${arg.message} (${typeof arg.cause === "string" ? arg.cause : /** @type {Error} */ (arg.cause).message})`
+				: arg.message
+
 			return console.error(chalk.redBright(`[${date}] ${message}`))
 		}
 

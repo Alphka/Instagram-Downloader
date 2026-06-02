@@ -7,13 +7,17 @@
 		"checkJs": true,
 		"strict": true,
 		"noImplicitAny": false,
-		"strictNullChecks": false,
+		"strictNullChecks": true,
 		"strictPropertyInitialization": false,
 		"resolveJsonModule": true,
 		"skipLibCheck": false,
 		"incremental": true,
 		"types": ["node"],
 		"lib": ["ESNext"],
+		"typeRoots": [
+			"node_modules/@types",
+			"src/typings"
+		],
 		"noEmit": true
 	},
 	"include": [

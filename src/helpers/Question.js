@@ -1,4 +1,4 @@
-import { createInterface } from "readline"
+import { createInterface } from "node:readline"
 
 /**
  * @param {string} question
@@ -10,8 +10,8 @@ export default function Question(question){
 		output: process.stdout
 	})
 
-	return new Promise(resolve => {
-		readline.question(question, answer => {
+	return new Promise((resolve) => {
+		readline.question(question, (answer) => {
 			readline.close()
 			resolve(answer)
 		})

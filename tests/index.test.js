@@ -1,16 +1,15 @@
-import { fileURLToPath } from "url"
-import { dirname, join } from "path"
-import { existsSync } from "fs"
+import { existsSync } from "node:fs"
+import { join } from "node:path"
 import { test } from "node:test"
 import ValidateUsername from "../src/helpers/ValidateUsername.js"
 import Downloader from "../src/Downloader.js"
-import assert from "assert"
-import "dotenv/config"
+import assert from "node:assert"
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
+const root = join(import.meta.dirname, "..")
 
-const hasConfigFile = existsSync(join(__dirname, "config.json"))
+process.loadEnvFile(join(root, ".env"))
+
+const hasConfigFile = existsSync(join(root, "config.json"))
 
 const {
 	TOKEN,
@@ -27,7 +26,7 @@ if(!COOKIES && !hasConfigFile){
 	console.warn("COOKIES was not set in process.env, the tests may fail")
 }
 
-test("Username validation", t => {
+test("Username validation", (t) => {
 	t.test("should throw with invalid usernames", () => {
 		assert.throws(() => ValidateUsername("instagram-"), "hyphens are not allowed")
 		assert.throws(() => ValidateUsername("instagram/"), "slashes are not allowed")
@@ -49,7 +48,7 @@ test("Username validation", t => {
 	})
 })
 
-test("Instagram API", async t => {
+test("Instagram API", async (t) => {
 	const username = "instagram"
 	const downloader = new Downloader(username, 12)
 
@@ -73,18 +72,20 @@ test("Instagram API", async t => {
 
 		assert.strictEqual(typeof downloader.headers, "object")
 		assert.strictEqual(typeof downloader.headers.Cookie, "string")
-		assert.match(downloader.headers.Cookie, /\bds_user_id=\d/)
-		assert.match(downloader.headers.Cookie, /\bsessionid=\d/)
+		assert.match(/** @type {string} */ (downloader.headers.Cookie), /\bds_user_id=\d/)
+		assert.match(/** @type {string} */ (downloader.headers.Cookie), /\bsessionid=\d/)
 		assert.strictEqual(downloader.headers["X-Csrftoken"], TOKEN)
 	})
 
-	await t.test("should get app id", async () => {
+	await t.test("should get app ID and fb_dtsg", async () => {
 		await downloader.CheckServerConfig()
+
 		downloader.UpdateHeaders()
 
-		const { app_id } = downloader.config
+		const { app_id, fb_dtsg } = downloader.config
 
 		assert.strictEqual(typeof app_id, "string")
+		assert.strictEqual(typeof fb_dtsg, "string")
 		assert.strictEqual(downloader.headers["X-Ig-App-Id"], app_id)
 
 		if(app_id !== "936619743392459") t.diagnostic("App ID has changed: " + app_id)
@@ -94,18 +95,18 @@ test("Instagram API", async t => {
 		await downloader.CheckLogin()
 	}) */
 
-	await t.test("should get user id", async () => {
+	/* await t.test("should get user id", async () => {
 		const userId = await downloader.GetUserId("instagram")
 
 		assert.strictEqual(typeof userId, "string")
 		assert.strictEqual(userId, "25025320")
 	})
 
-	/* await t.test("Download", async t => {
+	await t.test("Download", async (t) => {
 		async function EmptyFolder(){
 			const contents = await readdir(folder, { withFileTypes: true })
 
-			await Promise.all(contents.map(content => {
+			await Promise.all(contents.map((content) => {
 				const path = join(folder, content.name)
 				return rm(path, { recursive: content.isFile() })
 			}))

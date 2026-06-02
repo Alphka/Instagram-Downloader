@@ -8,16 +8,22 @@ export default function SplitPNGFrames(buffer){
 
 	let offset = 0
 
+	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 	while(true){
 		const start = buffer.indexOf(PNG_HEADER, offset)
 
 		if(start === -1) break
 
 		let headerPosition = start + PNG_HEADER.length
-		let lastGoodEnd = null
 		let foundIEND = false
+
+		/** @type {number | null} */
+		let lastGoodEnd = null
+
+		/** @type {number | null} */
 		let consumed = null
 
+		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 		while(true){
 			if(headerPosition + 8 > total) break
 
@@ -39,9 +45,9 @@ export default function SplitPNGFrames(buffer){
 		}
 
 		if(foundIEND){
-			frames.push(buffer.subarray(start, consumed))
+			frames.push(buffer.subarray(start, /** @type {number} */ (consumed)))
 
-			offset = consumed
+			offset = /** @type {number} */ (consumed)
 		}else if(lastGoodEnd){
 			frames.push(Buffer.concat([
 				buffer.subarray(start, lastGoodEnd),
