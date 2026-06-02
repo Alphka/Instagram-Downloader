@@ -7,40 +7,75 @@
 /coverage
 
 # Production
-/output/
-/build/
-
-# Misc
-.DS_Store
-*.pem
+output/
+build/
 
 # Debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Windows OS files
+Thumbs.db
+ehthumbs.db
+
+# macOS files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux system files
+*~
+*.swp
+*/*.swp
+
+# IDEs and editors
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# JetBrains IDEs (IntelliJ IDEA, PyCharm, etc.)
+*.iml
+*.ipr
+*.iws
+
+# WebStorm IDE
+*.ws-jetbrains.log
+
 # Local ENV files
 .env
 .env*.local
 
+# Log files
+*.log
+
+# Tye specific
+.tye/
+
+# Lock files
+/yarn.lock
+/package-lock.json
+
+# SonarQube
+.scannerwork
+
 # Vercel
 .vercel/
 
-# Turborepo
-.turbo
+# ESLint
+.eslintcache
+
+# CSpell
+.cspellcache
 
 # TypeScript
 *.tsbuildinfo
 
-# IDE
-.idea
-
-package-lock.json
-yarn.lock
 config.json
 /test*.*
 
 tests/*
 !tests/index.test.js
-
-.vscode/launch.json

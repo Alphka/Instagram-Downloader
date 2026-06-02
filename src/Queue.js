@@ -30,9 +30,13 @@ export default class Queue {
 
 		try{
 			const value = await promise
-			if(this._queueCallbacks.has(item)) this._queueCallbacks.get(item)(value)
+			if(this._queueCallbacks.has(item)){
+				/** @type {((value: any) => void)} */ (this._queueCallbacks.get(item))(value)
+			}
 		}catch(error){
-			if(this._queueCallbacks.has(item)) this._queueCallbacks.get(item)(error)
+			if(this._queueCallbacks.has(item)){
+				/** @type {((value: any) => void)} */ (this._queueCallbacks.get(item))(error)
+			}
 		}
 
 		this._queuePromises.delete(promise)
@@ -55,7 +59,7 @@ export default class Queue {
 			reject = rej
 		})
 
-		this._queueCallbacks.set(item, value => (value instanceof Error ? reject : resolve)(value))
+		this._queueCallbacks.set(item, (value) => (value instanceof Error ? reject : resolve)(value))
 
 		return await promise
 	}

@@ -1,27 +1,3 @@
-export interface APIHeaders {
-	[key: string]: string
-	"viewport-width"?: string
-	"X-Ig-Www-Claim"?: string
-	"X-Requested-With"?: "XMLHttpRequest"
-	"X-Asbd-Id"?: string
-	"X-Ig-App-Id"?: string
-	"X-Csrftoken"?: string
-	"X-Fb-Friendly-Name"?: string
-	"X-Fb-Lsd"?: string
-	"Sec-Ch-Prefers-Color-Scheme"?: string
-	"Sec-Ch-Ua"?: string
-	"Sec-Ch-Ua-Full-version-list"?: string
-	"Sec-Ch-Ua-Mobile"?: string
-	"Sec-Ch-Ua-Model"?: string
-	"Sec-Ch-Ua-Platform"?: string
-	"Sec-Ch-Ua-Platform-version"?: string
-	"Sec-Fetch-Dest"?: string
-	"Sec-Fetch-Mode"?: string
-	"Sec-Fetch-Site"?: string
-	DPR?: "1"
-	Cookie?: string
-}
-
 type AdditionalCandidates<T extends ImageVersion | VideoVersion> = {
 	igtv_first_frame: T
 	first_frame: T
