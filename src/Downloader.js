@@ -633,7 +633,10 @@ export default class Downloader {
 				reel_ids: userId
 			},
 			headers: {
-				Referer: username ? this.GetUserProfileLink(username) : BASE_URL + "/"
+				Referer: username ? this.GetUserProfileLink(username) : BASE_URL + "/",
+				"Sec-Fetch-Site": "same-origin",
+				"Sec-Fetch-Dest": "empty",
+				"Sec-Fetch-Mode": "cors"
 			},
 			responseType: "json"
 		})
@@ -882,23 +885,20 @@ export default class Downloader {
 							})
 						}
 
+						/* eslint-disable @stylistic/array-element-newline */
 						const ffmpegSimilarFramesProcess = spawn(/** @type {string} */ (ffmpegPath), [
-							"-i",
-							"pipe:3",
-							"-vf",
-							"mpdecimate",
-							"-f",
-							"null",
+							"-i", "pipe:3",
+							"-vf", "mpdecimate",
+							"-f", "null",
 							"-"
 						], {
 							windowsHide: true,
 							stdio: [
-								/* eslint-disable @stylistic/array-element-newline */
 								"ignore", "pipe", "pipe",
 								"pipe"
-								/* eslint-enable @stylistic/array-element-newline */
 							]
 						})
+						/* eslint-enable @stylistic/array-element-newline */
 
 						/** @type {Buffer[]} */
 						const similarFramesChunks = [];
@@ -914,29 +914,24 @@ export default class Downloader {
 							const similarFramesSize = Number(/** @type {RegExpMatchArray} */ (result.match(/frame=\s*(\d+)/))[1])
 
 							// Static video
+							/* eslint-disable @stylistic/array-element-newline */
 							if(similarFramesSize !== 0 && similarFramesSize < 300){
 								const ffmpegProcess = spawn(/** @type {string} */ (ffmpegPath), [
 									"-hide_banner",
-									"-loglevel",
-									"error",
-									"-i",
-									"pipe:3",
-									"-vf",
-									"fps=1",
-									"-vcodec",
-									"png",
-									"-f",
-									"image2pipe",
+									"-loglevel", "error",
+									"-i", "pipe:3",
+									"-vf", "fps=1",
+									"-vcodec", "png",
+									"-f", "image2pipe",
 									"pipe:4"
 								], {
 									windowsHide: true,
 									stdio: [
-										/* eslint-disable @stylistic/array-element-newline */
 										"ignore", "pipe", "pipe",
 										"pipe", "pipe"
-										/* eslint-enable @stylistic/array-element-newline */
 									]
 								})
+								/* eslint-enable @stylistic/array-element-newline */
 
 								/** @type {Buffer[]} */
 								const framesChunks = [];

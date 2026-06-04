@@ -69,7 +69,7 @@ const config = {
 		{
 			option: "with-thumbs",
 			alternative: "wt",
-			description: "Download thumbnails of videos"
+			description: "Download thumbnails of videos (requires ffmpeg for converting static videos into images)"
 		}
 	]
 }
