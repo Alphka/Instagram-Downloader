@@ -1,9 +1,0 @@
-packages:
-  - .
-savePrefix: ^
-overrides:
-  eslint: $eslint
-  globals: $globals
-  typescript: $typescript
-allowBuilds:
-  sharp: true

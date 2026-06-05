@@ -31,6 +31,7 @@ ehthumbs.db
 
 # IDEs and editors
 .vscode/*
+!.vscode/tasks.json
 !.vscode/settings.json
 !.vscode/extensions.json
 .idea/
@@ -47,7 +48,6 @@ ehthumbs.db
 
 # Local ENV files
 .env
-.env*.local
 
 # Log files
 *.log
@@ -74,8 +74,14 @@ ehthumbs.db
 # TypeScript
 *.tsbuildinfo
 
+
 config.json
 /test*.*
-
 tests/*
 !tests/index.test.js
+
+output/
+build/
+bin/
+
+*.html
