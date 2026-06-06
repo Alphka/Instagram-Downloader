@@ -1,6 +1,8 @@
+import { mkdir, readdir, rm } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { test } from "node:test"
+import GetOutputDirectory from "../src/helpers/GetOutputDirectory.js"
 import ValidateUsername from "../src/helpers/ValidateUsername.js"
 import Downloader from "../src/Downloader.js"
 import assert from "node:assert"
@@ -95,32 +97,28 @@ test("Instagram API", async (t) => {
 		await downloader.CheckLogin()
 	}) */
 
-	/* await t.test("should get user id", async () => {
-		const userId = await downloader.GetUserId("instagram")
+	await t.test("should get user id", async () => {
+		const userId = await downloader.GetUserId(username)
 
 		assert.strictEqual(typeof userId, "string")
 		assert.strictEqual(userId, "25025320")
 	})
 
+	const folder = join(GetOutputDirectory(root, false), username)
+
 	await t.test("Download", async (t) => {
-		async function EmptyFolder(){
-			const contents = await readdir(folder, { withFileTypes: true })
+		downloader.flatDir = true
 
-			await Promise.all(contents.map((content) => {
-				const path = join(folder, content.name)
-				return rm(path, { recursive: content.isFile() })
-			}))
-		}
-
-		if(existsSync(folder)) await EmptyFolder()
-		else await mkdir(folder, { recursive: true })
+		await rm(folder, { force: true, recursive: true })
+		await mkdir(folder, { recursive: true })
 
 		await t.test("should download 20 items from timeline", async () => {
-			await downloader.DownloadTimeline("instagram", folder, 20)
+			await downloader.DownloadTimeline(username, folder, 20)
 			assert.strictEqual((await readdir(folder)).length, 20)
 		})
 
-		await EmptyFolder()
+		await rm(folder, { recursive: true })
+		await mkdir(folder, { recursive: true })
 
 		await t.test("should download 20 items from highlights", async () => {
 			await downloader.DownloadHighlights("25025320", folder, true, 20)
@@ -128,5 +126,5 @@ test("Instagram API", async (t) => {
 		})
 
 		await rm(folder, { recursive: true })
-	}) */
+	})
 })

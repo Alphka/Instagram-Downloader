@@ -50,7 +50,7 @@ Options:
 ### Installation
 
 ```
-npm install
+pnpm install
 npm link
 ```
 

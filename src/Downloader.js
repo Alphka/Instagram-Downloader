@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync, createWriteStream, createReadStream } from "node:fs"
-import { BASE_URL, API_FACEBOOK_ACCOUNT, API_QUERY, API_REELS, API_GRAPHQL } from "./config.js"
 import { mkdir, writeFile, utimes, access, constants } from "node:fs/promises"
+import { BASE_URL, API_QUERY, API_REELS } from "./config.js"
 import { join, parse } from "node:path"
 import { Agent } from "node:https"
 import { spawn } from "cross-spawn"
@@ -348,16 +348,17 @@ export default class Downloader {
 			try{
 				if(!userId) throw new Error(`Failed to get user ID: ${username}`)
 
-				const { is_private, friendship_status: { following } } = await this.GetUser(userId, username)
-					// Make the GetUser call non fatal
-					.catch((error) => {
-						if(this.debug) Debug("GetUser error:", error)
-						return { is_private: false, friendship_status: { following: false } }
-					})
+				// TODO: Check if account is private with another endpoint
+				// const { is_private, friendship_status: { following } } = await this.GetUser(userId, username)
+				// 	// Make the GetUser call non fatal
+				// 	.catch((error) => {
+				// 		if(this.debug) Debug("GetUser error:", error)
+				// 		return { is_private: false, friendship_status: { following: false } }
+				// 	})
 
-				if(is_private && !following){
-					throw new Error(`You don't have access to a private account: ${username}`)
-				}
+				// if(is_private && !following){
+				// 	throw new Error(`You don't have access to a private account: ${username}`)
+				// }
 			}catch(error){
 				Log(error)
 				errored++
@@ -392,70 +393,70 @@ export default class Downloader {
 		// If all downloads failed
 		if(errored === this.usernames.length) process.exitCode = 1
 	}
-	async CheckLogin(){
-		/** @type {import("axios").AxiosResponse<import("./typings/api.js").FacebookAccountAPIResponse>} */
-		const response = await this.Request(API_FACEBOOK_ACCOUNT, "POST", {
-			headers: {
-				Referer: BASE_URL + "/"
-			},
-			responseType: "json",
-			maxRedirects: 0
-		})
+	// async CheckLogin(){
+	// 	/** @type {import("axios").AxiosResponse<import("./typings/api.js").FacebookAccountAPIResponse>} */
+	// 	const response = await this.Request(API_FACEBOOK_ACCOUNT, "POST", {
+	// 		headers: {
+	// 			Referer: BASE_URL + "/"
+	// 		},
+	// 		responseType: "json",
+	// 		maxRedirects: 0
+	// 	})
 
-		if(this.debug) Debug("CheckLogin:", typeof response.data, response.data)
+	// 	if(this.debug) Debug("CheckLogin:", typeof response.data, response.data)
 
-		if(typeof response.data === "object" && "status" in response.data){
-			const { status, message } = response.data
-			if(status === "ok") return
-			if(message) throw new Error(`User is not logged in: ${message}`)
-		}
+	// 	if(typeof response.data === "object" && "status" in response.data){
+	// 		const { status, message } = response.data
+	// 		if(status === "ok") return
+	// 		if(message) throw new Error(`User is not logged in: ${message}`)
+	// 	}
 
-		throw new Error("User is not logged in")
-	}
-	/**
-	 * @param {string} userId
-	 * @param {string} [username]
-	 */
-	async GetUser(userId, username){
-		const { fb_dtsg } = this.config
+	// 	throw new Error("User is not logged in")
+	// }
+	// /**
+	//  * @param {string} userId
+	//  * @param {string} [username]
+	//  */
+	// async GetUser(userId, username){
+	// 	const { fb_dtsg } = this.config
 
-		/** @type {import("axios").AxiosResponse<import("./typings/api.js").QueryUserAPIResponse>} */
-		const response = await this.Request(API_GRAPHQL, "POST", {
-			data: new URLSearchParams({
-				dpr: "1",
-				fb_dtsg: /** @type {string} */ (fb_dtsg),
-				fb_api_caller_class: "RelayModern",
-				fb_api_req_friendly_name: "PolarisProfilePageContentQuery",
-				variables: JSON.stringify({
-					id: userId,
-					render_surface: "PROFILE"
-				}),
-				server_timestamps: "true",
-				doc_id: "26947072594934194"
-			}),
-			headers: {
-				Accept: "*/*",
-				Referer: username ? this.GetUserProfileLink(username) : BASE_URL + "/",
-				"X-Fb-Friendly-Name": "PolarisProfilePageContentQuery",
-				"X-Root-Field-Name": "fetch__XDTUserDict"
-			},
-			maxRedirects: 0,
-			responseType: "json"
-		})
+	// 	/** @type {import("axios").AxiosResponse<import("./typings/api.js").QueryUserAPIResponse>} */
+	// 	const response = await this.Request(API_GRAPHQL, "POST", {
+	// 		data: new URLSearchParams({
+	// 			dpr: "1",
+	// 			fb_dtsg: /** @type {string} */ (fb_dtsg),
+	// 			fb_api_caller_class: "RelayModern",
+	// 			fb_api_req_friendly_name: "PolarisProfilePageContentQuery",
+	// 			variables: JSON.stringify({
+	// 				id: userId,
+	// 				render_surface: "PROFILE"
+	// 			}),
+	// 			server_timestamps: "true",
+	// 			doc_id: "26947072594934194"
+	// 		}),
+	// 		headers: {
+	// 			Accept: "*/*",
+	// 			Referer: username ? this.GetUserProfileLink(username) : BASE_URL + "/",
+	// 			"X-Fb-Friendly-Name": "PolarisProfilePageContentQuery",
+	// 			"X-Root-Field-Name": "fetch__XDTUserDict"
+	// 		},
+	// 		maxRedirects: 0,
+	// 		responseType: "json"
+	// 	})
 
-		if(typeof response.data === "object"){
-			const { data } = response.data
+	// 	if(typeof response.data === "object"){
+	// 		const { data } = response.data
 
-			if(data && "user" in data) return data.user
+	// 		if(data && "user" in data) return data.user
 
-			throw new Error(`Failed to get user: ${username} (${userId})`)
-		}
+	// 		throw new Error(`Failed to get user: ${username} (${userId})`)
+	// 	}
 
-		throw new Error(`User not found: ${username}`)
-	}
+	// 	throw new Error(`User not found: ${username}`)
+	// }
 	/** @param {string} username */
 	GetUserProfileLink(username){
-		return /** @type {const} */ (`/${username}/`)
+		return /** @type {const} */ (`${BASE_URL}/${username}/`)
 	}
 	/** @param {string} username */
 	async GetUserId(username){
