@@ -1,12 +1,5 @@
 {
 	"recommendations": [
-		"dbaeumer.vscode-eslint",
-		"usernamehw.errorlens",
-		"editorconfig.editorconfig",
-		"ms-vscode.vscode-typescript-next",
-		"visualstudioexptteam.intellicode-api-usage-examples",
-		"visualstudioexptteam.vscodeintellicode",
-		"christian-kohler.npm-intellisense",
-		"streetsidesoftware.code-spell-checker"
+		"golang.go"
 	]
 }
