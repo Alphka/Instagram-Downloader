@@ -93,17 +93,24 @@ func (client *Client) buildRequest(ctx context.Context, method, rawURL string, b
 		return nil, fmt.Errorf("reading cookies: %w", err)
 	}
 
-	if cookieHeader := config.BuildCookieHeader(cookies); cookieHeader != "" {
-		request.Header.Set("Cookie", cookieHeader)
+	delete(cookies, "csrftoken")
+	delete(cookies, "sessionid")
+	delete(cookies, "ds_user_id")
+
+	cookieHeader := config.BuildCookieHeader(cookies)
+	authCookies := fmt.Sprintf("csrftoken=%s; sessionid=%s; ds_user_id=%s", client.store.GetToken(), client.store.GetSessionID(), client.store.GetUserID())
+
+	if cookieHeader != "" {
+		request.Header.Set("Cookie", authCookies+"; "+cookieHeader)
+	} else {
+		request.Header.Set("Cookie", authCookies)
 	}
 
 	if appID, err := client.store.GetAppID(); err == nil && appID != "" {
 		request.Header.Set("X-Ig-App-Id", appID)
 	}
 
-	if token := cookies["csrftoken"]; token != "" {
-		request.Header.Set("X-Csrftoken", token)
-	}
+	request.Header.Set("X-Csrftoken", client.store.GetToken())
 
 	for key, value := range overrides {
 		if value == "" {
@@ -125,7 +132,8 @@ func (client *Client) do(request *http.Request) (*http.Response, []byte, error) 
 
 	response, err := client.httpClient.Do(request)
 	if err != nil {
-		return nil, nil, fmt.Errorf("http %s %s: %w", request.Method, request.URL, err)
+		// return nil, nil, fmt.Errorf("http %s %s: %w", request.Method, request.URL, err)
+		return nil, nil, fmt.Errorf("http request failed: %w", err)
 	}
 	defer response.Body.Close()
 
@@ -179,7 +187,18 @@ func (client *Client) persistSetCookies(response *http.Response) error {
 			continue
 		}
 
-		incoming[cookie.Name] = url.QueryEscape(cookie.Value)
+		escapedValue := url.QueryEscape(cookie.Value)
+
+		switch cookie.Name {
+		case "csrftoken":
+			client.store.UpdateToken(escapedValue)
+		case "sessionid":
+			client.store.UpdateSessionID(escapedValue)
+		case "ds_user_id":
+			client.store.UpdateUserID(escapedValue)
+		default:
+			incoming[cookie.Name] = escapedValue
+		}
 	}
 
 	return client.store.MergeCookies(incoming)

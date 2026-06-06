@@ -171,12 +171,7 @@ func (instagram *Instagram) GetHighlights(ctx context.Context, userID, username 
 		return nil, fmt.Errorf("reading fb_dtsg: %w", err)
 	}
 
-	cookies, err := instagram.store.GetCookies()
-	if err != nil {
-		return nil, fmt.Errorf("reading cookies: %w", err)
-	}
-
-	if sessionID := cookies["sessionid"]; sessionID == "" || sessionID == `""` {
+	if sessionID := instagram.store.GetSessionID(); sessionID == "" || sessionID == `""` {
 		return nil, fmt.Errorf("unauthenticated or login session expired; sessionid is missing")
 	}
 

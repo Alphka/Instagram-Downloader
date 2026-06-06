@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 
 	"github.com/Alphka/Instagram-Downloader/config"
 	"github.com/Alphka/Instagram-Downloader/download"
@@ -30,7 +29,9 @@ func main() {
 		noHighlightCover bool
 		flatDirectory    bool
 		withThumbnails   bool
-		envFlag          string
+		setToken         string
+		setUserID        string
+		setSessionID     string
 	)
 
 	rootCommand := &cobra.Command{
@@ -45,18 +46,6 @@ func main() {
 
 			if noHighlights {
 				noHighlightCover = true
-			}
-
-			envFilePath, err := resolveEnvFilePath(envFlag)
-			if err != nil {
-				return err
-			}
-
-			if err := loadDotEnv(envFilePath); err != nil {
-				if os.IsNotExist(err) {
-					return fmt.Errorf("credentials file not found at %q; use --env to specify a path", envFilePath)
-				}
-				return fmt.Errorf("loading credentials file: %w", err)
 			}
 
 			configDirectory, err := config.DefaultDirectory()
@@ -75,8 +64,8 @@ func main() {
 			}
 			defer store.Close()
 
-			if err := store.LoadFromEnvironment(); err != nil {
-				return fmt.Errorf("loading credentials from environment: %w", err)
+			if err := store.InitializeCredentials(setToken, setSessionID, setUserID); err != nil {
+				return err
 			}
 
 			var itemLimit *int
@@ -109,7 +98,9 @@ func main() {
 
 	flags := rootCommand.Flags()
 	flags.StringVarP(&outputFlag, "output", "o", "", "output directory")
-	flags.StringVar(&envFlag, "env", "", "path to credentials file (default: .env next to the executable)")
+	flags.StringVar(&setToken, "set-token", "", "set or overwrite authentication CSRF token")
+	flags.StringVar(&setUserID, "set-userid", "", "set or overwrite authentication user ID")
+	flags.StringVar(&setSessionID, "set-sessionid", "", "set or overwrite authentication session ID")
 	flags.BoolVarP(&force, "force", "f", false, "force creation of output directory if it does not exist")
 	flags.IntVarP(&queueSize, "queue", "q", 12, "number of concurrent downloads")
 	flags.IntVarP(&limit, "limit", "l", 0, "maximum number of items to download per user")
@@ -170,60 +161,4 @@ func resolveOutputDirectory(outputFlag, configDirectory string, force bool) (str
 	}
 
 	return target, nil
-}
-
-func resolveEnvFilePath(envFlag string) (string, error) {
-	if envFlag != "" {
-		if _, err := os.Stat(envFlag); err != nil {
-			return "", fmt.Errorf("env file not found: %s", envFlag)
-		}
-
-		return envFlag, nil
-	}
-
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("getting working directory: %w", err)
-	}
-
-	cwdEnvPath := filepath.Join(cwd, ".env")
-	if _, err := os.Stat(cwdEnvPath); err == nil {
-		return cwdEnvPath, nil
-	}
-
-	executable, err := os.Executable()
-	if err != nil {
-		return "", fmt.Errorf("resolving executable path: %w", err)
-	}
-
-	return filepath.Join(filepath.Dir(executable), ".env"), nil
-}
-
-func loadDotEnv(path string) error {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("reading env file %s: %w", path, err)
-	}
-
-	for _, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(line)
-
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		key, value, found := strings.Cut(line, "=")
-		if !found {
-			continue
-		}
-
-		key = strings.TrimSpace(key)
-		value = strings.TrimSpace(value)
-
-		if os.Getenv(key) == "" {
-			os.Setenv(key, value)
-		}
-	}
-
-	return nil
 }

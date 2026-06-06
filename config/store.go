@@ -10,10 +10,16 @@ import (
 	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/zalando/go-keyring"
 )
 
+const keyringService = "instadl"
+
 type Store struct {
-	database *sql.DB
+	database  *sql.DB
+	token     string
+	userID    string
+	sessionID string
 }
 
 type Cookies map[string]string
@@ -68,47 +74,6 @@ func (store *Store) migrate() error {
 
 func (store *Store) Close() error {
 	return store.database.Close()
-}
-
-func (store *Store) LoadFromEnvironment() error {
-	token := os.Getenv("TOKEN")
-	userID := os.Getenv("USER_ID")
-	sessionID := os.Getenv("SESSION_ID")
-	rawCookies := os.Getenv("COOKIES")
-
-	if token == "" && userID == "" && sessionID == "" && rawCookies == "" {
-		return nil
-	}
-
-	cookies, err := store.GetCookies()
-	if err != nil {
-		return fmt.Errorf("loading existing cookies: %w", err)
-	}
-
-	if rawCookies != "" {
-		var parsed Cookies
-		if err := json.Unmarshal([]byte(rawCookies), &parsed); err != nil {
-			return fmt.Errorf("parsing COOKIES environment variable: %w", err)
-		}
-
-		for key, value := range parsed {
-			cookies[key] = value
-		}
-	}
-
-	if token != "" {
-		cookies["csrftoken"] = token
-	}
-
-	if userID != "" {
-		cookies["ds_user_id"] = userID
-	}
-
-	if sessionID != "" {
-		cookies["sessionid"] = sessionID
-	}
-
-	return store.SetCookies(cookies)
 }
 
 func (store *Store) get(key string) (string, error) {
@@ -209,4 +174,85 @@ func BuildCookieHeader(cookies Cookies) string {
 	}
 
 	return strings.Join(parts, "; ")
+}
+
+func (store *Store) InitializeCredentials(flagToken, flagSessionID, flagUserID string) error {
+	existingToken, _ := keyring.Get(keyringService, "csrftoken")
+	existingUserID, _ := keyring.Get(keyringService, "userid")
+	existingSessionID, _ := keyring.Get(keyringService, "sessionid")
+
+	finalToken := existingToken
+	if flagToken != "" {
+		finalToken = flagToken
+	}
+
+	finalUserID := existingUserID
+	if flagUserID != "" {
+		finalUserID = flagUserID
+	}
+
+	finalSessionID := existingSessionID
+	if flagSessionID != "" {
+		finalSessionID = flagSessionID
+	}
+
+	if finalUserID != "" && finalUserID != existingUserID && existingUserID != "" {
+		store.SetCookies(make(Cookies))
+		store.SetFbDtsg("")
+	}
+
+	if finalToken == "" || finalSessionID == "" || finalUserID == "" {
+		return errors.New("authentication required: token, sessionid, and userid must be set")
+	}
+
+	if flagToken != "" && flagToken != existingToken {
+		keyring.Set(keyringService, "csrftoken", finalToken)
+	}
+
+	if flagUserID != "" && flagUserID != existingUserID {
+		keyring.Set(keyringService, "userid", finalUserID)
+	}
+
+	if flagSessionID != "" && flagSessionID != existingSessionID {
+		keyring.Set(keyringService, "sessionid", finalSessionID)
+	}
+
+	store.token = finalToken
+	store.userID = finalUserID
+	store.sessionID = finalSessionID
+
+	return nil
+}
+
+func (store *Store) GetToken() string {
+	return store.token
+}
+
+func (store *Store) GetUserID() string {
+	return store.userID
+}
+
+func (store *Store) GetSessionID() string {
+	return store.sessionID
+}
+
+func (store *Store) UpdateToken(token string) {
+	if token != "" && token != store.token {
+		store.token = token
+		keyring.Set(keyringService, "csrftoken", token)
+	}
+}
+
+func (store *Store) UpdateUserID(userID string) {
+	if userID != "" && userID != store.userID {
+		store.userID = userID
+		keyring.Set(keyringService, "userid", userID)
+	}
+}
+
+func (store *Store) UpdateSessionID(sessionID string) {
+	if sessionID != "" && sessionID != store.sessionID {
+		store.sessionID = sessionID
+		keyring.Set(keyringService, "sessionid", sessionID)
+	}
 }
