@@ -518,26 +518,26 @@ func (downloader *Downloader) downloadMediaItem(ctx context.Context, item api.Me
 	bestImage := item.BestImage()
 
 	if bestVideo != nil {
-		// Static video detection: only when ffmpeg is available, thumbnails are
-		// enabled, and the image is 640px wide (the heuristic from the original).
-		if downloader.options.WithThumbnails && bestImage != nil && bestImage.Width == 640 {
+		if downloader.options.WithThumbnails && bestImage != nil {
 			ffmpegPath := downloader.resolveFFmpeg()
 
-			if ffmpegPath != "" {
-				if staticErr := downloader.tryExtractStaticFrame(ctx, ffmpegPath, bestVideo.URL, bestImage.URL, directory); staticErr != nil {
+			if bestImage.Width == 640 && ffmpegPath != "" {
+				// Static video: a single image with audio. Extract the frame
+				// instead of downloading the 640px cover image.
+				if staticErr := downloader.tryExtractStaticFrame(ctx, ffmpegPath, bestVideo.URL, bestImage.URL, directory, takenAt); staticErr != nil {
 					log.Errorf("extracting static video frame: %v", staticErr)
+				}
+			} else {
+				// Real video thumbnail, or ffmpeg unavailable: download the
+				// thumbnail directly.
+				if _, err := downloader.fileDownloader.Download(ctx, bestImage.URL, directory, takenAt); err != nil {
+					log.Errorf("downloading thumbnail: %v", err)
 				}
 			}
 		}
 
 		if _, err := downloader.fileDownloader.Download(ctx, bestVideo.URL, directory, takenAt); err != nil {
 			return fmt.Errorf("downloading video: %w", err)
-		}
-
-		if downloader.options.WithThumbnails && bestImage != nil {
-			if _, err := downloader.fileDownloader.Download(ctx, bestImage.URL, directory, takenAt); err != nil {
-				log.Errorf("downloading thumbnail: %v", err)
-			}
 		}
 
 		return nil
@@ -552,7 +552,7 @@ func (downloader *Downloader) downloadMediaItem(ctx context.Context, item api.Me
 	return nil
 }
 
-func (downloader *Downloader) tryExtractStaticFrame(ctx context.Context, ffmpegPath, videoURL, imageURL, directory string) error {
+func (downloader *Downloader) tryExtractStaticFrame(ctx context.Context, ffmpegPath, videoURL, imageURL, directory string, takenAt time.Time) error {
 	imageFilename, err := validate.URLFilename(imageURL)
 	if err != nil {
 		return err
@@ -566,7 +566,7 @@ func (downloader *Downloader) tryExtractStaticFrame(ctx context.Context, ffmpegP
 	}
 
 	// Ensure the video file is on disk before passing it to ffmpeg.
-	videoResult, err := downloader.fileDownloader.Download(ctx, videoURL, directory, time.Now())
+	videoResult, err := downloader.fileDownloader.Download(ctx, videoURL, directory, takenAt)
 	if err != nil {
 		return fmt.Errorf("downloading video for static detection: %w", err)
 	}
@@ -589,6 +589,8 @@ func (downloader *Downloader) tryExtractStaticFrame(ctx context.Context, ffmpegP
 	if err := os.WriteFile(framePath, jpegData, 0o644); err != nil {
 		return fmt.Errorf("writing static frame: %w", err)
 	}
+
+	os.Chtimes(framePath, takenAt, takenAt)
 
 	return nil
 }
