@@ -1,68 +1,88 @@
 <h1 align="center">Instagram Downloader</h1>
 
 ### Description
-A program written in JavaScript to download images and videos from Instagram.
+A program written in Go to download images and videos from Instagram.
 
 <hr>
 
 ### Requirements
 
-- [Node.js](https://nodejs.org/en/download) (minimum v22.22)
-- [PNPM](https://pnpm.io/installation) (v10 or v11)
+- [Go](https://go.dev/dl/) (minimum v1.25)
+- [FFmpeg](https://ffmpeg.org/download.html) (optional, required for static video detection with `--with-thumbs`)
 
 <hr>
 
 ### Usage
 
 ```
-instadl [options] username
-instadl [options] username1 username2
+instadl [flags] <username>
+instadl [flags] <username1> <username2>
 ```
 
 <hr>
 
-### Supported options
+### Supported flags
 
 ```
-Usage: instadl [options] <string>
+Usage:
+  instadl <username> [username...] [flags]
 
-Arguments:
-  string                Usernames
-
-Options:
-  -v, --version         Display program version
-  -o, --output [path]   Output directory
-  -f, --force           Force creation of output directory
-  -q, --queue <number>  Set how many items to get from Instagram API (default: 12)
-  -l, --limit <number>  Set how many items to download in total
-  -ns, --no-stories     Disable stories download
-  -nt, --no-timeline    Disable timeline download
-  -nh, --no-highlights  Disable highlights download
-  -nhc, --no-hcover     Disable highlights' cover download
-  -d, --debug           Verbose output
-  -fd, --flat-dir       Download all contents of the user in the same directory
-  -wt, --with-thumbs    Download thumbnails of videos (requires ffmpeg for converting static videos into images)
-  -h, --help            Display help
+Flags:
+  -d, --debug                  enable verbose output
+      --flat-dir               save all user content into a single directory
+  -f, --force                  force creation of output directory if it does not exist
+  -h, --help                   help for instadl
+  -l, --limit int              maximum number of items to download per user
+      --no-hcover              skip highlight cover download
+      --no-highlights          skip highlights download
+      --no-stories             skip stories download
+      --no-timeline            skip timeline download
+  -o, --output string          output directory
+  -q, --queue int              number of concurrent downloads (default 12)
+      --set-sessionid string   set or overwrite authentication session ID
+      --set-token string       set or overwrite authentication CSRF token
+      --set-userid string      set or overwrite authentication user ID
+  -v, --version                version for instadl
+      --with-thumbs            also download video thumbnails (requires ffmpeg in PATH for static video detection)
 ```
 
 <hr>
 
 ### Installation
 
-```
-pnpm install
-npm link
+```sh
+# Linux (Bash)
+go build -o $GOPATH/bin/instadl .
+
+# Windows PowerShell
+go build -o $env:GOPATH/bin/instadl.exe .
 ```
 
-> [!NOTE]
-> Before executing the CLI program, copy the contents of the file `.env.example` to a new file named `.env` and
-> fill all the environment variables there with your account credentials that are stored in the browser's cookies.
+<hr>
+
+### Authentication
+
+Before running the program for the first time, you need to provide your Instagram session credentials.
+These are stored in the browser cookies when you log in to Instagram.
+
+Open Instagram in a browser, go to DevTools → Application/Storage → Cookies → `https://www.instagram.com` and copy
+the values of `csrftoken`, `ds_user_id` and `sessionid`.
+
+Then run the program once with the three flags below to save the credentials:
+
+```
+instadl --set-token <csrftoken> --set-userid <ds_user_id> --set-sessionid <sessionid> <username>
+```
+
+Credentials are stored securely in the operating system's native credential manager (Windows Credential Manager on Windows,
+Keychain on macOS, or GNOME Keyring/KWallet on Linux) and are reused automatically on subsequent runs.
+
+> [!IMPORTANT]
 > This program will not work without authentication.
 
-> [!NOTE]
-> If the code fails, even after setting your account credentials in the `.env` file, try setting the `COOKIES`
-> property with a JSON object, like this: `COOKIES={"datr":"...","ig_did":"..."}`, and deleting the `config.json` file.
-> This avoids authentication issues with the Instagram API.
+> [!IMPORTANT]
+> If requests start failing after some time, your session may have expired.
+> Get fresh cookie values from the browser and run the command above again to update them.
 
 ### License
 
