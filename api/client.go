@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -123,6 +124,50 @@ func (client *Client) buildRequest(ctx context.Context, method, rawURL string, b
 	return request, nil
 }
 
+// wrapContentEncodingReader wraps response.Body with the appropriate
+// decompression reader based on the Content-Encoding header value. The
+// returned cleanup function must be called (e.g. via defer) to release any
+// resources held by the decompression reader. If no supported encoding is
+// detected, the raw body is returned unchanged and cleanup is a no-op.
+func (client *Client) wrapContentEncodingReader(response *http.Response) (io.Reader, func(), error) {
+	reader := io.Reader(response.Body)
+	cleanup := func() {}
+
+	switch response.Header.Get("Content-Encoding") {
+	case "gzip":
+		gzipReader, err := gzip.NewReader(response.Body)
+		if err != nil {
+			return nil, cleanup, fmt.Errorf("gzip reader: %w", err)
+		}
+
+		reader = gzipReader
+		cleanup = func() {
+			gzipReader.Close()
+		}
+	case "deflate":
+		flateReader := flate.NewReader(response.Body)
+
+		reader = flateReader
+		cleanup = func() {
+			flateReader.Close()
+		}
+	case "br":
+		reader = brotli.NewReader(response.Body)
+	case "zstd":
+		zstdReader, err := zstd.NewReader(response.Body)
+		if err != nil {
+			return nil, cleanup, fmt.Errorf("zstd reader: %w", err)
+		}
+
+		reader = zstdReader
+		cleanup = func() {
+			zstdReader.Close()
+		}
+	}
+
+	return reader, cleanup, nil
+}
+
 // do executes the request, persists any Set-Cookie headers received, and
 // returns the raw response body.
 func (client *Client) do(request *http.Request) (*http.Response, []byte, error) {
@@ -132,40 +177,23 @@ func (client *Client) do(request *http.Request) (*http.Response, []byte, error) 
 
 	response, err := client.httpClient.Do(request)
 	if err != nil {
-		// return nil, nil, fmt.Errorf("http %s %s: %w", request.Method, request.URL, err)
 		return nil, nil, fmt.Errorf("http request failed: %w", err)
 	}
 	defer response.Body.Close()
 
-	var reader io.Reader = response.Body
+	reader, cleanup, err := client.wrapContentEncodingReader(response)
+	if err != nil {
+		return response, nil, err
+	}
+	defer cleanup()
 
-	switch response.Header.Get("Content-Encoding") {
-	case "gzip":
-		gzipReader, err := gzip.NewReader(response.Body)
-		if err != nil {
-			return response, nil, fmt.Errorf("gzip reader: %w", err)
-		}
-		defer gzipReader.Close()
+	start := time.Now()
+	body, err := io.ReadAll(reader)
 
-		reader = gzipReader
-	case "deflate":
-		flateReader := flate.NewReader(response.Body)
-		defer flateReader.Close()
-
-		reader = flateReader
-	case "br":
-		reader = brotli.NewReader(response.Body)
-	case "zstd":
-		zstdReader, err := zstd.NewReader(response.Body)
-		if err != nil {
-			return response, nil, fmt.Errorf("zstd reader: %w", err)
-		}
-		defer zstdReader.Close()
-
-		reader = zstdReader
+	if client.debug {
+		log.Debug("io.ReadAll: %v (%d bytes)", time.Since(start), len(body))
 	}
 
-	body, err := io.ReadAll(reader)
 	if err != nil {
 		return response, nil, fmt.Errorf("reading response body: %w", err)
 	}
@@ -253,6 +281,107 @@ func (client *Client) GetStream(ctx context.Context, url string, overrides map[s
 	}
 
 	return response.Body, nil
+}
+
+// GetPatternMatches performs a GET request and incrementally searches the
+// response body for the first capture group (index 1) of each provided
+// pattern, reading in fixed-size chunks. Reading stops as soon as all
+// patterns have been matched or the response body is exhausted.
+//
+// A small overlap (overlapSize bytes) from the tail of each window is carried
+// into the next iteration to avoid missing matches that span chunk boundaries.
+//
+// This function does not reuse do() because do() buffers the entire response
+// body via io.ReadAll before returning. Streaming requires processing the
+// body incrementally as it arrives. Content-encoding decompression is shared
+// with do() via wrapContentEncodingReader.
+func (client *Client) GetPatternMatches(
+	ctx context.Context,
+	rawURL string,
+	overrides map[string]string,
+	patterns []*regexp.Regexp,
+) ([]string, error) {
+	const chunkSize = 128 * 1024
+	const overlapSize = 1 * 1024
+
+	request, err := client.buildRequest(ctx, http.MethodGet, rawURL, nil, overrides)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := client.httpClient.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("http request failed: %w", err)
+	}
+	defer response.Body.Close()
+
+	if err := client.persistSetCookies(response); err != nil {
+		log.Errorf("persisting cookies: %v", err)
+	}
+
+	reader, cleanup, err := client.wrapContentEncodingReader(response)
+	if err != nil {
+		return nil, err
+	}
+	defer cleanup()
+
+	chunk := make([]byte, chunkSize)
+	found := make([]bool, len(patterns))
+	results := make([]string, len(patterns))
+	remaining := len(patterns)
+
+	var tail []byte
+
+	for remaining > 0 {
+		n, readErr := reader.Read(chunk)
+
+		if n == 0 && readErr == nil {
+			return nil, fmt.Errorf("unexpected zero-byte read from response body")
+		}
+
+		if n > 0 {
+			var window []byte
+
+			if len(tail) > 0 {
+				window = make([]byte, len(tail)+n)
+				copy(window, tail)
+				copy(window[len(tail):], chunk[:n])
+			} else {
+				window = chunk[:n]
+			}
+
+			for i, pattern := range patterns {
+				if found[i] {
+					continue
+				}
+
+				matches := pattern.FindSubmatch(window)
+				if len(matches) >= 2 {
+					results[i] = string(matches[1])
+					found[i] = true
+					remaining--
+				}
+			}
+
+			if len(window) >= overlapSize {
+				tail = make([]byte, overlapSize)
+				copy(tail, window[len(window)-overlapSize:])
+			} else {
+				tail = make([]byte, len(window))
+				copy(tail, window)
+			}
+		}
+
+		if readErr == io.EOF {
+			break
+		}
+
+		if readErr != nil {
+			return nil, fmt.Errorf("reading response body: %w", readErr)
+		}
+	}
+
+	return results, nil
 }
 
 // PostForm performs a POST request with application/x-www-form-urlencoded body

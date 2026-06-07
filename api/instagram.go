@@ -2,10 +2,13 @@ package api
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"net/http/httptrace"
 	"net/url"
 	"regexp"
+	"time"
 
 	"github.com/Alphka/Instagram-Downloader/config"
 	"github.com/Alphka/Instagram-Downloader/log"
@@ -36,8 +39,46 @@ func NewInstagram(client *Client, store *config.Store, debug bool) *Instagram {
 	}
 }
 
+func withTrace(ctx context.Context) context.Context {
+	var start time.Time
+
+	requestStart := time.Now()
+
+	trace := &httptrace.ClientTrace{
+		DNSStart: func(_ httptrace.DNSStartInfo) {
+			start = time.Now()
+		},
+		DNSDone: func(_ httptrace.DNSDoneInfo) {
+			log.Debug("DNS: %v", time.Since(start))
+		},
+		ConnectStart: func(_, _ string) {
+			start = time.Now()
+		},
+		ConnectDone: func(_, _ string, _ error) {
+			log.Debug("TCP connect: %v", time.Since(start))
+		},
+		TLSHandshakeStart: func() {
+			start = time.Now()
+		},
+		TLSHandshakeDone: func(_ tls.ConnectionState, _ error) {
+			log.Debug("TLS handshake: %v", time.Since(start))
+		},
+		GotFirstResponseByte: func() {
+			log.Debug("First byte: %v", time.Since(requestStart))
+		},
+	}
+
+	return httptrace.WithClientTrace(ctx, trace)
+}
+
 func (instagram *Instagram) CheckServerConfig(ctx context.Context) error {
-	html, err := instagram.client.GetText(ctx, "/", map[string]string{
+	traceContext := ctx
+
+	if instagram.debug {
+		traceContext = withTrace(ctx)
+	}
+
+	matches, err := instagram.client.GetPatternMatches(traceContext, "/", map[string]string{
 		"Accept":         "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
 		"Sec-Fetch-Dest": "document",
 		"Sec-Fetch-Mode": "navigate",
@@ -45,41 +86,41 @@ func (instagram *Instagram) CheckServerConfig(ctx context.Context) error {
 		"Sec-Fetch-User": "?1",
 		"X-Csrftoken":    "",
 		"X-Ig-App-Id":    "",
-	})
+	}, []*regexp.Regexp{appIDPattern, fbDtsgPattern})
 	if err != nil {
 		return fmt.Errorf("fetching instagram home page: %w", err)
 	}
 
-	appIDMatches := appIDPattern.FindStringSubmatch(html)
-	if len(appIDMatches) < 2 {
+	appID := matches[0]
+	fbDtsg := matches[1]
+
+	if appID == "" {
 		existingAppID, _ := instagram.store.GetAppID()
 		if existingAppID == "" {
 			return fmt.Errorf("app ID not found in instagram home page")
 		}
 	} else {
-		if err := instagram.store.SetAppID(appIDMatches[1]); err != nil {
+		if err := instagram.store.SetAppID(appID); err != nil {
 			return fmt.Errorf("persisting app ID: %w", err)
 		}
 
-		appID, _ := instagram.store.GetAppID()
 		if instagram.debug {
 			log.Debug("app ID: %s", appID)
 		}
 	}
 
-	fbDtsgMatches := fbDtsgPattern.FindStringSubmatch(html)
-	if len(fbDtsgMatches) < 2 {
+	if fbDtsg == "" {
 		existingFbDtsg, _ := instagram.store.GetFbDtsg()
 		if existingFbDtsg == "" {
 			return fmt.Errorf("fb_dtsg not found in instagram home page")
 		}
 	} else {
-		if err := instagram.store.SetFbDtsg(fbDtsgMatches[1]); err != nil {
+		if err := instagram.store.SetFbDtsg(fbDtsg); err != nil {
 			return fmt.Errorf("persisting fb_dtsg: %w", err)
 		}
 
 		if instagram.debug {
-			log.Debug("fb_dtsg: %s", fbDtsgMatches[1])
+			log.Debug("fb_dtsg: %s", fbDtsg)
 		}
 	}
 
