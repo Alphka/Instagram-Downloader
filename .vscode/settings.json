@@ -53,7 +53,8 @@
 		"usertags",
 		"vcodec",
 		"vercel",
-		"Vercel"
+		"Vercel",
+		"zstd"
 	],
 	"cSpell.ignorePaths": [
 		"package-lock.json",
@@ -65,57 +66,34 @@
 		".vscode"
 	],
 
-	"javascript.format.insertSpaceAfterConstructor": false,
-	"javascript.format.insertSpaceAfterCommaDelimiter": true,
-	"javascript.format.insertSpaceAfterSemicolonInForStatements": true,
-	"javascript.format.insertSpaceAfterKeywordsInControlFlowStatements": false,
-	"javascript.format.insertSpaceAfterOpeningAndBeforeClosingEmptyBraces": false,
-	"javascript.format.insertSpaceAfterFunctionKeywordForAnonymousFunctions": false,
-	"javascript.format.insertSpaceAfterOpeningAndBeforeClosingNonemptyBraces": true,
-	"javascript.format.insertSpaceAfterOpeningAndBeforeClosingNonemptyBrackets": false,
-	"javascript.format.insertSpaceAfterOpeningAndBeforeClosingNonemptyParenthesis": false,
-	"javascript.format.insertSpaceAfterOpeningAndBeforeClosingJsxExpressionBraces": false,
-	"javascript.format.insertSpaceAfterOpeningAndBeforeClosingTemplateStringBraces": false,
-	"javascript.format.insertSpaceBeforeAndAfterBinaryOperators": true,
-	"javascript.format.insertSpaceBeforeFunctionParenthesis": false,
-	"javascript.format.placeOpenBraceOnNewLineForFunctions": false,
-	"javascript.format.placeOpenBraceOnNewLineForControlBlocks": false,
-	"javascript.format.semicolons": "remove",
-	"javascript.preferences.importModuleSpecifier": "shortest",
-	"javascript.preferences.importModuleSpecifierEnding": "minimal",
-	"javascript.preferences.quoteStyle": "double",
-
-	"typescript.enablePromptUseWorkspaceTsdk": false,
-	"typescript.format.indentSwitchCase": true,
-	"typescript.format.insertSpaceAfterConstructor": false,
-	"typescript.format.insertSpaceAfterTypeAssertion": true,
-	"typescript.format.insertSpaceAfterCommaDelimiter": true,
-	"typescript.format.insertSpaceAfterSemicolonInForStatements": true,
-	"typescript.format.insertSpaceAfterKeywordsInControlFlowStatements": false,
-	"typescript.format.insertSpaceAfterOpeningAndBeforeClosingEmptyBraces": false,
-	"typescript.format.insertSpaceAfterFunctionKeywordForAnonymousFunctions": false,
-	"typescript.format.insertSpaceAfterOpeningAndBeforeClosingNonemptyBraces": true,
-	"typescript.format.insertSpaceAfterOpeningAndBeforeClosingNonemptyBrackets": false,
-	"typescript.format.insertSpaceAfterOpeningAndBeforeClosingNonemptyParenthesis": false,
-	"typescript.format.insertSpaceAfterOpeningAndBeforeClosingJsxExpressionBraces": false,
-	"typescript.format.insertSpaceAfterOpeningAndBeforeClosingTemplateStringBraces": false,
-	"typescript.format.insertSpaceBeforeAndAfterBinaryOperators": true,
-	"typescript.format.insertSpaceBeforeFunctionParenthesis": false,
-	"typescript.format.placeOpenBraceOnNewLineForFunctions": false,
-	"typescript.format.placeOpenBraceOnNewLineForControlBlocks": false,
-	"typescript.format.semicolons": "remove",
-	"typescript.preferences.importModuleSpecifier": "shortest",
-	"typescript.preferences.importModuleSpecifierEnding": "minimal",
-	"typescript.preferences.preferTypeOnlyAutoImports": true,
-	"typescript.preferences.quoteStyle": "double",
-	"typescript.reportStyleChecksAsWarnings": true,
+	"js/ts.format.indentSwitchCase": true,
+	"js/ts.format.insertSpaceAfterConstructor": false,
+	"js/ts.format.insertSpaceAfterCommaDelimiter": true,
+	"js/ts.format.insertSpaceAfterSemicolonInForStatements": true,
+	"js/ts.format.insertSpaceAfterKeywordsInControlFlowStatements": false,
+	"js/ts.format.insertSpaceAfterOpeningAndBeforeClosingEmptyBraces": false,
+	"js/ts.format.insertSpaceAfterFunctionKeywordForAnonymousFunctions": false,
+	"js/ts.format.insertSpaceAfterOpeningAndBeforeClosingNonemptyBraces": true,
+	"js/ts.format.insertSpaceAfterOpeningAndBeforeClosingNonemptyBrackets": false,
+	"js/ts.format.insertSpaceAfterOpeningAndBeforeClosingNonemptyParenthesis": false,
+	"js/ts.format.insertSpaceAfterOpeningAndBeforeClosingJsxExpressionBraces": false,
+	"js/ts.format.insertSpaceAfterOpeningAndBeforeClosingTemplateStringBraces": false,
+	"js/ts.format.insertSpaceAfterTypeAssertion": true,
+	"js/ts.format.insertSpaceBeforeAndAfterBinaryOperators": true,
+	"js/ts.format.insertSpaceBeforeFunctionParenthesis": false,
+	"js/ts.format.placeOpenBraceOnNewLineForFunctions": false,
+	"js/ts.format.placeOpenBraceOnNewLineForControlBlocks": false,
+	"js/ts.format.semicolons": "remove",
+	"js/ts.preferences.importModuleSpecifier": "shortest",
+	"js/ts.preferences.importModuleSpecifierEnding": "minimal",
+	"js/ts.preferences.preferTypeOnlyAutoImports": true,
+	"js/ts.preferences.quoteStyle": "double",
+	"js/ts.reportStyleChecksAsWarnings": true,
+	"js/ts.tsdk.promptToUseWorkspaceVersion": false,
 
 	"eslint.enable": true,
 	"eslint.format.enable": true,
 
-	"editor.formatOnPaste": false,
-	"editor.formatOnSave": false,
-	"editor.formatOnType": false,
 	"editor.insertSpaces": false,
 	"editor.tabSize": 4,
 
@@ -157,20 +135,5 @@
 
 	"npm-intellisense.importES6": true,
 	"npm-intellisense.importQuotes": "\"",
-	"npm-intellisense.importLinebreak": "\n",
-
-	"json.schemas": [
-		{
-			"fileMatch": [
-				".ncurc",
-				".ncurc.json"
-			],
-			"url": "https://raw.githubusercontent.com/raineorshine/npm-check-updates/main/src/types/RunOptions.json"
-		}
-	],
-	"yaml.schemas": {
-		"https://raw.githubusercontent.com/raineorshine/npm-check-updates/main/src/types/RunOptions.json": [
-			".ncurc.yml"
-		]
-	}
+	"npm-intellisense.importLinebreak": "\n"
 }

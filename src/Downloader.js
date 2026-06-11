@@ -2,30 +2,37 @@ import { existsSync, readFileSync, writeFileSync, createWriteStream, createReadS
 import { mkdir, writeFile, utimes, access, constants } from "node:fs/promises"
 import { BASE_URL, API_QUERY, API_REELS } from "./config.js"
 import { join, parse } from "node:path"
-import { Agent } from "node:https"
+import { PassThrough } from "node:stream"
 import { spawn } from "cross-spawn"
 import axios, { AxiosHeaders } from "axios"
 import GetCorrectContent from "./helpers/GetCorrectContent.js"
+import SanitizeFilename from "./SanitizeFilename.js"
 import ValidateUsername from "./helpers/ValidateUsername.js"
 import FindRegexArray from "./helpers/FindRegexArray.js"
 import GetURLFilename from "./helpers/GetURLFilename.js"
 import SplitPNGFrames from "./helpers/SplitPNGFrames.js"
 import IsAbsoluteURL from "./helpers/IsAbsoluteURL.js"
-import filenamify from "filenamify"
 import isNumber from "./helpers/isNumber.js"
 import Debug from "./helpers/Debug.js"
+import https from "node:https"
 import Queue from "./Queue.js"
 import sharp from "sharp"
 import which from "which"
+import http from "node:http"
 import mime from "mime"
 import Log from "./helpers/Log.js"
+
+const httpAgent = new http.Agent({ keepAlive: true })
+const httpsAgent = new https.Agent({ keepAlive: true })
 
 /** @type {import("axios").AxiosInstance & { enableRequestLogs?: boolean }} */
 const api = axios.create({
 	baseURL: BASE_URL,
-	httpsAgent: new Agent({
-		rejectUnauthorized: false
-	}),
+	httpAgent,
+	httpsAgent,
+	transitional: {
+		advertiseZstdAcceptEncoding: true
+	},
 	allowAbsoluteUrls: true
 })
 
@@ -39,12 +46,8 @@ api.interceptors.request.use((request) => {
 	if(isAbsoluteURL){
 		const url = new URL(/** @type {string} */ (request.url))
 
-		if(!request.headers.has("Host")) request.headers.set("Host", url.host)
 		if(!request.headers.has("Origin")) request.headers.set("Origin", url.origin)
-	}else{
-		if(!request.headers.has("Host")) request.headers.set("Host", BASE_URL.replace(/^https?:\/\//, ""))
-		if(!request.headers.has("Origin")) request.headers.set("Origin", BASE_URL)
-	}
+	}else if(!request.headers.has("Origin")) request.headers.set("Origin", BASE_URL)
 
 	return request
 })
@@ -57,6 +60,7 @@ const isTesting = process.env.npm_command === "test" || process.env.npm_lifecycl
 api.defaults.headers.common = {
 	Accept: "*/*",
 	"Accept-Language": "en-US,en;q=0.9",
+	Connection: "keep-alive",
 	Dnt: "1",
 	"Sec-Ch-Prefers-Color-Scheme": "dark",
 	"Sec-Ch-Ua": '"Chromium";v="148", "Google Chrome";v="148", "Not/A)Brand";v="99"',
@@ -308,35 +312,7 @@ export default class Downloader {
 
 		await this.CheckServerConfig()
 
-		// The function CheckLogin is problematic: Even after setting your credentials,
-		// it says the user is not logged in
-
-		/*
-		do{
-			try{
-				// TODO: Change this when anonymous downloads are implemented
-				// Only stories and highlights should require authentication
-
-				// await this.CheckLogin()
-				// Log("Logged in")
-
-				break
-			}catch{
-				Log(new Error("You are not logged in. Type your data for authentication."))
-
-				const id = (await Question("User id: ")).trim()
-				const token = (await Question("CSRF Token: ")).trim()
-				const session = (await Question("Session id: ")).trim()
-
-				if(!token || !id || !session) continue
-
-				this.config.csrftoken = this.config.cookie.csrftoken = token
-				this.config.cookie.ds_user_id = id
-				this.config.cookie.sessionid = session
-
-				this.WriteConfig(true)
-			}
-		}while(true) */
+		// TODO: Check if user is logged in
 
 		let errored = 0
 
@@ -348,17 +324,7 @@ export default class Downloader {
 			try{
 				if(!userId) throw new Error(`Failed to get user ID: ${username}`)
 
-				// TODO: Check if account is private with another endpoint
-				// const { is_private, friendship_status: { following } } = await this.GetUser(userId, username)
-				// 	// Make the GetUser call non fatal
-				// 	.catch((error) => {
-				// 		if(this.debug) Debug("GetUser error:", error)
-				// 		return { is_private: false, friendship_status: { following: false } }
-				// 	})
-
-				// if(is_private && !following){
-				// 	throw new Error(`You don't have access to a private account: ${username}`)
-				// }
+				// TODO: Check whether the account is private and logged in user has no access
 			}catch(error){
 				Log(error)
 				errored++
@@ -393,67 +359,6 @@ export default class Downloader {
 		// If all downloads failed
 		if(errored === this.usernames.length) process.exitCode = 1
 	}
-	// async CheckLogin(){
-	// 	/** @type {import("axios").AxiosResponse<import("./typings/api.js").FacebookAccountAPIResponse>} */
-	// 	const response = await this.Request(API_FACEBOOK_ACCOUNT, "POST", {
-	// 		headers: {
-	// 			Referer: BASE_URL + "/"
-	// 		},
-	// 		responseType: "json",
-	// 		maxRedirects: 0
-	// 	})
-
-	// 	if(this.debug) Debug("CheckLogin:", typeof response.data, response.data)
-
-	// 	if(typeof response.data === "object" && "status" in response.data){
-	// 		const { status, message } = response.data
-	// 		if(status === "ok") return
-	// 		if(message) throw new Error(`User is not logged in: ${message}`)
-	// 	}
-
-	// 	throw new Error("User is not logged in")
-	// }
-	// /**
-	//  * @param {string} userId
-	//  * @param {string} [username]
-	//  */
-	// async GetUser(userId, username){
-	// 	const { fb_dtsg } = this.config
-
-	// 	/** @type {import("axios").AxiosResponse<import("./typings/api.js").QueryUserAPIResponse>} */
-	// 	const response = await this.Request(API_GRAPHQL, "POST", {
-	// 		data: new URLSearchParams({
-	// 			dpr: "1",
-	// 			fb_dtsg: /** @type {string} */ (fb_dtsg),
-	// 			fb_api_caller_class: "RelayModern",
-	// 			fb_api_req_friendly_name: "PolarisProfilePageContentQuery",
-	// 			variables: JSON.stringify({
-	// 				id: userId,
-	// 				render_surface: "PROFILE"
-	// 			}),
-	// 			server_timestamps: "true",
-	// 			doc_id: "26947072594934194"
-	// 		}),
-	// 		headers: {
-	// 			Accept: "*/*",
-	// 			Referer: username ? this.GetUserProfileLink(username) : BASE_URL + "/",
-	// 			"X-Fb-Friendly-Name": "PolarisProfilePageContentQuery",
-	// 			"X-Root-Field-Name": "fetch__XDTUserDict"
-	// 		},
-	// 		maxRedirects: 0,
-	// 		responseType: "json"
-	// 	})
-
-	// 	if(typeof response.data === "object"){
-	// 		const { data } = response.data
-
-	// 		if(data && "user" in data) return data.user
-
-	// 		throw new Error(`Failed to get user: ${username} (${userId})`)
-	// 	}
-
-	// 	throw new Error(`User not found: ${username}`)
-	// }
 	/** @param {string} username */
 	GetUserProfileLink(username){
 		return /** @type {const} */ (`${BASE_URL}/${username}/`)
@@ -684,7 +589,7 @@ export default class Downloader {
 
 				Log(`Downloading highlight: '${title}' (${id.substring(id.indexOf(":") + 1)})`)
 
-				const targetDir = this.flatDir ? folder : join(folder, "highlights", filenamify(title))
+				const targetDir = this.flatDir ? folder : join(folder, "highlights", SanitizeFilename(title))
 
 				if(items.length){
 					await mkdir(targetDir, { recursive: true })
@@ -1168,13 +1073,19 @@ export default class Downloader {
 			}
 
 			for(const cookieConfig of /** @type {import("axios").AxiosResponseHeaders} */ (response.headers).getSetCookie()){
-				const [key, ...values] = cookieConfig.split(";")[0].split("=")
+				const semicolonIndex = cookieConfig.indexOf(";")
+				const cookie = semicolonIndex === -1
+					? cookieConfig
+					: cookieConfig.substring(0, semicolonIndex)
+
+				const separatorIndex = cookie.indexOf("=")
+				const key = cookie.substring(0, separatorIndex)
 
 				if(key === "th_eu_pref"){
 					continue
 				}
 
-				const value = encodeURIComponent(values.join("="))
+				const value = encodeURIComponent(cookie.substring(separatorIndex + 1))
 
 				this.config.cookie[key] = value
 			}
@@ -1189,27 +1100,76 @@ export default class Downloader {
 	async CheckServerConfig(){
 		const { config } = this
 
-		const response = await this.Request("/", "GET", { responseType: "text" })
+		const OVERLAP_SIZE = 1024
 
-		if(typeof response.data === "string"){
-			const appId = response.data.match(/"X-IG-App-ID":"(\d+)"/)?.[1]
+		/** @type {import("axios").AxiosResponse<import("stream").Readable>} */
+		const response = await this.Request("/", "GET", {
+			responseType: "stream"
+		})
 
-			if(appId){
-				config.app_id = appId
-			}else if(isTesting || !config.app_id){
-				throw new Error("App ID was not found")
-			}
+		/** @type {string | undefined} */
+		let appId
 
-			const fbDtsg = response.data.match(/"DTSGInitData",\[\],\{"token":"([-\w:]+)"/)?.[1]
-			// /(?:(?:"DTSGInit(?:ial)?Data",\[\],|"dtsg":)\{"token":"|"s":"XPolarisProfileController","w":\d+,"f":")([-\w:]+)"/
+		/** @type {string | undefined} */
+		let fbDtsg
 
-			if(fbDtsg){
-				config.fb_dtsg = fbDtsg
-			}else if(isTesting || !config.fb_dtsg){
-				throw new Error("fb_dtsg was not found")
-			}
+		let tail = ""
 
-			this.UpdateHeaders()
+		const stream = new PassThrough({
+			highWaterMark: 128 * 1024
+		})
+
+		await /** @type {Promise<void>} */ (new Promise((resolve, reject) => {
+			stream.on("data", (/** @type {Buffer} */ chunk) => {
+				const currentWindow = tail + chunk.toString("utf8")
+
+				if(!appId){
+					const match = currentWindow.match(/"X-IG-App-ID":"(\d+)"/)
+					appId = match?.at(1)
+				}
+
+				if(!fbDtsg){
+					const match = currentWindow.match(/"DTSGInitData",\[\],\{"token":"([-\w:]+)"/)
+					fbDtsg = match?.at(1)
+				}
+
+				tail = currentWindow.length >= OVERLAP_SIZE
+					? currentWindow.slice(-OVERLAP_SIZE)
+					: currentWindow
+
+				if(appId && fbDtsg){
+					// response.data.destroy()
+					resolve()
+				}
+			})
+
+			stream.on("end", resolve)
+
+			stream.on("error", (/** @type {NodeJS.ErrnoException} */ err) => {
+				if(err.code === "ERR_STREAM_DESTROYED"){
+					if(this.debug) Debug("CheckServerConfig: ERR_STREAM_DESTROYED")
+					resolve()
+					return
+				}
+
+				reject(err)
+			})
+
+			response.data.pipe(stream)
+		}))
+
+		if(appId){
+			config.app_id = appId
+		}else if(isTesting || !config.app_id){
+			throw new Error("App ID was not found")
 		}
+
+		if(fbDtsg){
+			config.fb_dtsg = fbDtsg
+		}else if(isTesting || !config.fb_dtsg){
+			throw new Error("fb_dtsg was not found")
+		}
+
+		this.UpdateHeaders()
 	}
 }

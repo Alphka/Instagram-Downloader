@@ -1,7 +1,7 @@
 {
 	"author": "Kayo Souza",
 	"name": "insta-downloader",
-	"version": "3.4.6",
+	"version": "4.0.0",
 	"description": "An application to download content from Instagram",
 	"main": "src/index.js",
 	"scripts": {
@@ -25,7 +25,6 @@
 		"chalk": "^5.6.2",
 		"commander": "^12.1.0",
 		"cross-spawn": "^7.0.6",
-		"filenamify": "^7.0.1",
 		"mime": "^4.1.0",
 		"sharp": "^0.34.5",
 		"which": "^7.0.0"
@@ -38,14 +37,14 @@
 		"@types/node": "^25.9.2",
 		"@types/which": "^3.0.4",
 		"eslint": "^10.4.1",
-		"eslint-plugin-n": "^18.0.1",
+		"eslint-plugin-n": "^18.1.0",
 		"eslint-plugin-regexp": "^3.1.0",
 		"eslint-plugin-sonarjs": "^4.0.3",
-		"eslint-plugin-unicorn": "^64.0.0",
+		"eslint-plugin-unicorn": "^65.0.1",
 		"eslint-plugin-unused-imports": "^4.4.1",
 		"globals": "^17.6.0",
 		"typescript": "^6.0.3",
-		"typescript-eslint": "^8.60.1"
+		"typescript-eslint": "^8.61.0"
 	},
 	"overrides": {
 		"eslint": "$eslint",
@@ -69,7 +68,8 @@
 		"instadl": "src/index.js"
 	},
 	"engines": {
-		"node": "^22.22 || ^23.8 || >=24"
+		"node": "^22.22 || ^23.8 || >=24",
+		"pnpm": "^10.26 || 11"
 	},
 	"license": "ISC",
 	"type": "module"
