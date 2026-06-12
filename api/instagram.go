@@ -124,6 +124,11 @@ func (instagram *Instagram) CheckServerConfig(ctx context.Context) error {
 		}
 	}
 
+	instagram.client.store.MergeCookies(map[string]string{
+		"dpr": "1",
+		"wd":  "1920x911",
+	})
+
 	return nil
 }
 

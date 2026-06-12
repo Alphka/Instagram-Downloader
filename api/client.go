@@ -23,7 +23,6 @@ const (
 	baseURL            = "https://www.instagram.com"
 	endpointQuery      = "/graphql/query"
 	endpointReelsMedia = "/api/v1/feed/reels_media/"
-	endpointGraphQL    = "/api/graphql"
 )
 
 type Client struct {
@@ -35,7 +34,7 @@ type Client struct {
 func NewClient(store *config.Store, debug bool) *Client {
 	return &Client{
 		httpClient: &http.Client{
-			Timeout: 60 * time.Second,
+			Timeout: time.Minute,
 			CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
 				return http.ErrUseLastResponse
 			},
@@ -211,21 +210,13 @@ func (client *Client) persistSetCookies(response *http.Response) error {
 	incoming := make(map[string]string)
 
 	for _, cookie := range response.Cookies() {
-		if cookie.Name == "th_eu_pref" {
-			continue
-		}
-
-		escapedValue := url.QueryEscape(cookie.Value)
-
 		switch cookie.Name {
-		case "csrftoken":
-			client.store.UpdateToken(escapedValue)
+		case "th_eu_pref", "csrftoken", "ds_user_id":
+			continue
 		case "sessionid":
-			client.store.UpdateSessionID(escapedValue)
-		case "ds_user_id":
-			client.store.UpdateUserID(escapedValue)
+			client.store.UpdateSessionID(url.QueryEscape(cookie.Value))
 		default:
-			incoming[cookie.Name] = escapedValue
+			incoming[cookie.Name] = url.QueryEscape(cookie.Value)
 		}
 	}
 

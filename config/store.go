@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -143,9 +144,7 @@ func (store *Store) MergeCookies(incoming map[string]string) error {
 		return err
 	}
 
-	for key, value := range incoming {
-		cookies[key] = value
-	}
+	maps.Copy(cookies, incoming)
 
 	return store.SetCookies(cookies)
 }

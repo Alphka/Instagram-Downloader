@@ -140,10 +140,6 @@ func (downloader *Downloader) processUser(ctx context.Context, username string) 
 		return fmt.Errorf("getting user ID for %s: %w", username, err)
 	}
 
-	if downloader.options.Debug {
-		log.Debug("user %q has ID: %s", username, userID)
-	}
-
 	log.Infof("Downloading contents from user: %s (id: %s)", username, userID)
 
 	userDirectory := filepath.Join(downloader.options.OutputDirectory, username)
