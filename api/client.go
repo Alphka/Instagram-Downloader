@@ -35,7 +35,11 @@ func NewClient(store *config.Store, debug bool) *Client {
 	return &Client{
 		httpClient: &http.Client{
 			Timeout: time.Minute,
-			CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			CheckRedirect: func(request *http.Request, via []*http.Request) error {
+				if debug {
+					log.Debug("Redirect intercepted: %s -> %s (via %d requests)", via[len(via)-1].URL.Path, request.URL.Path, len(via))
+				}
+
 				return http.ErrUseLastResponse
 			},
 		},
@@ -197,7 +201,7 @@ func (client *Client) do(request *http.Request) (*http.Response, []byte, error) 
 		return response, nil, fmt.Errorf("reading response body: %w", err)
 	}
 
-	if err := client.persistSetCookies(response); err != nil {
+	if err := client.persistSetCookies(request, response); err != nil {
 		log.Errorf("persisting cookies: %v", err)
 	}
 
@@ -206,15 +210,27 @@ func (client *Client) do(request *http.Request) (*http.Response, []byte, error) 
 
 // persistSetCookies parses Set-Cookie headers from the response and merges
 // them into the store.
-func (client *Client) persistSetCookies(response *http.Response) error {
+func (client *Client) persistSetCookies(request *http.Request, response *http.Response) error {
+	cookieHeader := request.Header.Get("Cookie")
+
+	if !strings.Contains(cookieHeader, "csrftoken=") ||
+		!strings.Contains(cookieHeader, "sessionid=") ||
+		!strings.Contains(cookieHeader, "ds_user_id=") {
+		return nil
+	}
+
 	incoming := make(map[string]string)
 
 	for _, cookie := range response.Cookies() {
 		switch cookie.Name {
-		case "th_eu_pref", "csrftoken", "ds_user_id":
+		case "th_eu_pref":
 			continue
+		case "csrftoken":
+			client.store.UpdateToken(url.QueryEscape(cookie.Value))
 		case "sessionid":
 			client.store.UpdateSessionID(url.QueryEscape(cookie.Value))
+		case "ds_user_id":
+			client.store.UpdateUserID(url.QueryEscape(cookie.Value))
 		default:
 			incoming[cookie.Name] = url.QueryEscape(cookie.Value)
 		}
@@ -267,7 +283,7 @@ func (client *Client) GetStream(ctx context.Context, url string, overrides map[s
 		return nil, fmt.Errorf("http GET %s: %w", url, err)
 	}
 
-	if err := client.persistSetCookies(response); err != nil {
+	if err := client.persistSetCookies(request, response); err != nil {
 		log.Errorf("persisting cookies: %v", err)
 	}
 
@@ -306,7 +322,7 @@ func (client *Client) GetPatternMatches(
 	}
 	defer response.Body.Close()
 
-	if err := client.persistSetCookies(response); err != nil {
+	if err := client.persistSetCookies(request, response); err != nil {
 		log.Errorf("persisting cookies: %v", err)
 	}
 
