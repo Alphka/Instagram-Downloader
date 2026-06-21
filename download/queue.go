@@ -2,10 +2,7 @@ package download
 
 import "context"
 
-// Queue limits the number of goroutines that can execute concurrently. It is
-// implemented as a buffered channel used as a semaphore, which is the idiomatic
-// Go approach and replaces the manual Set/Map bookkeeping in the original
-// Queue.js.
+// Queue limits the number of goroutines that can execute concurrently.
 //
 // Usage:
 //

@@ -55,16 +55,16 @@ func withTrace(ctx context.Context) context.Context {
 			start = time.Now()
 		},
 		ConnectDone: func(_, _ string, _ error) {
-			log.Debug("TCP connect: %v", time.Since(start))
+			log.Debug("TCP: %v", time.Since(start))
 		},
 		TLSHandshakeStart: func() {
 			start = time.Now()
 		},
 		TLSHandshakeDone: func(_ tls.ConnectionState, _ error) {
-			log.Debug("TLS handshake: %v", time.Since(start))
+			log.Debug("TLS: %v", time.Since(start))
 		},
 		GotFirstResponseByte: func() {
-			log.Debug("First byte: %v", time.Since(requestStart))
+			log.Debug("TTFB: %v", time.Since(requestStart))
 		},
 	}
 
@@ -135,6 +135,10 @@ func (instagram *Instagram) CheckServerConfig(ctx context.Context) error {
 func (instagram *Instagram) GetUserID(ctx context.Context, username string) (string, error) {
 	profileURL := "https://www.instagram.com/" + username + "/"
 
+	if instagram.debug {
+		log.Debug("Getting user ID: %s", username)
+	}
+
 	html, err := instagram.client.GetText(ctx, profileURL, map[string]string{
 		"Accept":         "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
 		"Cookie":         "",
@@ -200,7 +204,6 @@ func (instagram *Instagram) GetTimeline(ctx context.Context, username, after str
 		"Accept":             "*/*",
 		"Priority":           "u=1, i",
 		"Referer":            "https://www.instagram.com/" + username + "/",
-		"Content-Type":       "application/x-www-form-urlencoded",
 		"X-Fb-Friendly-Name": "PolarisProfilePostsQuery",
 		"X-Root-Field-Name":  "xdt_api__v1__feed__user_timeline_graphql_connection",
 	}, &response)
@@ -241,7 +244,6 @@ func (instagram *Instagram) GetHighlights(ctx context.Context, userID, username 
 		"Accept":             "*/*",
 		"Priority":           "u=1, i",
 		"Referer":            referer,
-		"Content-Type":       "application/x-www-form-urlencoded",
 		"Sec-Fetch-Dest":     "empty",
 		"Sec-Fetch-Mode":     "cors",
 		"Sec-Fetch-Site":     "same-origin",
@@ -310,13 +312,12 @@ func (instagram *Instagram) GetStories(ctx context.Context, userID, username str
 
 	var response StoriesResponse
 	err := instagram.client.Get(ctx, rawURL, map[string]string{
-		"Referer":        "https://www.instagram.com/" + username + "/",
-		"Sec-Fetch-Site": "same-origin",
-		"Sec-Fetch-Dest": "empty",
-		"Sec-Fetch-Mode": "cors",
-
+		"Accept":           "*/*",
+		"Referer":          "https://www.instagram.com/" + username + "/",
+		"Sec-Fetch-Site":   "same-origin",
+		"Sec-Fetch-Dest":   "empty",
+		"Sec-Fetch-Mode":   "cors",
 		"X-Requested-With": "XMLHttpRequest",
-		"Accept":           "application/json",
 	}, &response)
 	if err != nil {
 		return nil, err

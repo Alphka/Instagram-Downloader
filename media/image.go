@@ -103,6 +103,7 @@ const (
 	FormatPNG
 	FormatWebP
 	FormatGIF
+	FormatHEIC
 )
 
 var (
@@ -113,7 +114,25 @@ var (
 	}
 	riffMagic     = []byte("RIFF")
 	webpSignature = []byte("WEBP")
+	ftypBox       = []byte("ftyp")
 )
+
+// heicBrands lists the ISO base media "major brand" values that identify a
+// file as HEIC/HEIF. These appear at byte offset 8, right after a 4-byte box
+// size and the "ftyp" box type at offset 4. The box size itself cannot be
+// matched as a fixed prefix like the other formats because it varies per file.
+var heicBrands = [][]byte{
+	[]byte("heic"),
+	[]byte("heix"),
+	[]byte("hevc"),
+	[]byte("hevx"),
+	[]byte("heim"),
+	[]byte("heis"),
+	[]byte("hevm"),
+	[]byte("hevs"),
+	[]byte("mif1"),
+	[]byte("msf1"),
+}
 
 func DetectFormat(data []byte) Format {
 	if bytes.HasPrefix(data, jpegMagic) {
@@ -124,11 +143,31 @@ func DetectFormat(data []byte) Format {
 		return FormatPNG
 	}
 
+	if isHEIC(data) {
+		return FormatHEIC
+	}
+
 	if len(data) >= 12 && bytes.HasPrefix(data, riffMagic) && bytes.Equal(data[8:12], webpSignature) {
 		return FormatWebP
 	}
 
 	return FormatUnknown
+}
+
+func isHEIC(data []byte) bool {
+	if len(data) < 12 || !bytes.Equal(data[4:8], ftypBox) {
+		return false
+	}
+
+	brand := data[8:12]
+
+	for _, heicBrand := range heicBrands {
+		if bytes.Equal(brand, heicBrand) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func FormatExtension(format Format) string {
@@ -139,6 +178,8 @@ func FormatExtension(format Format) string {
 		return "png"
 	case FormatWebP:
 		return "webp"
+	case FormatHEIC:
+		return "heic"
 	default:
 		return ""
 	}

@@ -226,10 +226,22 @@ func (client *Client) persistSetCookies(request *http.Request, response *http.Re
 		case "th_eu_pref":
 			continue
 		case "csrftoken":
+			if client.store.GetToken() == cookie.Value {
+				continue
+			} else if client.debug {
+				log.Debug("Instagram updated the csrftoken with: %s", cookie.Value)
+			}
+
 			client.store.UpdateToken(url.QueryEscape(cookie.Value))
 		case "sessionid":
 			client.store.UpdateSessionID(url.QueryEscape(cookie.Value))
 		case "ds_user_id":
+			if client.store.GetUserID() == cookie.Value {
+				continue
+			} else if client.debug {
+				log.Debug("Instagram updated the ds_user_id with: %s", cookie.Value)
+			}
+
 			client.store.UpdateUserID(url.QueryEscape(cookie.Value))
 		default:
 			incoming[cookie.Name] = url.QueryEscape(cookie.Value)
@@ -399,7 +411,7 @@ func (client *Client) PostForm(ctx context.Context, url string, form url.Values,
 		return err
 	}
 
-	request.Header.Set("Content-Type", "application/x-www-form-urlencoded;charset=utf-8")
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	_, responseBody, err := client.do(request)
 	if err != nil {

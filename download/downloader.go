@@ -475,10 +475,10 @@ func (downloader *Downloader) downloadItems(ctx context.Context, items []api.Med
 				}
 
 				carouselMediaItem := api.MediaItem{
-					TakenAt:       item.TakenAt,
 					PK:            carouselItem.PK,
 					ImageVersions: carouselItem.ImageVersions.Candidates,
 					VideoVersions: carouselItem.VideoVersions,
+					TakenAt:       item.TakenAt,
 				}
 
 				if itemErr := downloader.downloadMediaItem(ctx, carouselMediaItem, carouselDirectory); itemErr != nil {

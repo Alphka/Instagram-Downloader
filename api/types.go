@@ -1,17 +1,17 @@
 package api
 
 type ImageVersion struct {
+	URL    string `json:"url"`
 	Width  int    `json:"width"`
 	Height int    `json:"height"`
-	URL    string `json:"url"`
 }
 
 type VideoVersion struct {
-	Width  int    `json:"width"`
-	Height int    `json:"height"`
+	ID     string `json:"id"`
 	URL    string `json:"url"`
 	Type   int    `json:"type"`
-	ID     string `json:"id"`
+	Width  int    `json:"width"`
+	Height int    `json:"height"`
 }
 
 type ImageVersions struct {
@@ -29,32 +29,32 @@ type CarouselItem struct {
 }
 
 type FeedItem struct {
-	TakenAt            int64          `json:"taken_at"`
-	PK                 string         `json:"pk"`
 	ID                 string         `json:"id"`
+	PK                 string         `json:"pk"`
 	MediaType          int            `json:"media_type"`
 	ImageVersions      ImageVersions  `json:"image_versions2"`
 	VideoVersions      []VideoVersion `json:"video_versions"`
-	CarouselMediaCount int            `json:"carousel_media_count"`
 	CarouselMedia      []CarouselItem `json:"carousel_media"`
+	CarouselMediaCount int            `json:"carousel_media_count"`
+	TakenAt            int64          `json:"taken_at"`
 }
 
 type GraphTimelineMedia struct {
-	TakenAt            int64          `json:"taken_at"`
-	PK                 string         `json:"pk"`
 	ID                 string         `json:"id"`
+	PK                 string         `json:"pk"`
 	ImageVersions      ImageVersions  `json:"image_versions2"`
 	VideoVersions      []VideoVersion `json:"video_versions"`
-	CarouselMediaCount int            `json:"carousel_media_count"`
 	CarouselMedia      []CarouselItem `json:"carousel_media"`
+	CarouselMediaCount int            `json:"carousel_media_count"`
+	TakenAt            int64          `json:"taken_at"`
 }
 
 type GraphHighlightsMedia struct {
-	TakenAt       int64          `json:"taken_at"`
-	PK            string         `json:"pk"`
 	ID            string         `json:"id"`
+	PK            string         `json:"pk"`
 	ImageVersions ImageVersions  `json:"image_versions2"`
 	VideoVersions []VideoVersion `json:"video_versions"`
+	TakenAt       int64          `json:"taken_at"`
 }
 
 type TimelinePageInfo struct {
@@ -136,11 +136,11 @@ type StoriesResponse struct {
 }
 
 type MediaItem struct {
-	TakenAt       int64
 	PK            string
 	ImageVersions []ImageVersion
 	VideoVersions []VideoVersion
 	CarouselItems []CarouselItem
+	TakenAt       int64
 }
 
 func (item *MediaItem) BestImage() *ImageVersion {
@@ -165,29 +165,29 @@ func (item *MediaItem) IsCarousel() bool {
 
 func FeedItemToMediaItem(feedItem FeedItem) MediaItem {
 	return MediaItem{
-		TakenAt:       feedItem.TakenAt,
 		PK:            feedItem.PK,
 		ImageVersions: feedItem.ImageVersions.Candidates,
 		VideoVersions: feedItem.VideoVersions,
 		CarouselItems: feedItem.CarouselMedia,
+		TakenAt:       feedItem.TakenAt,
 	}
 }
 
 func TimelineMediaToMediaItem(timelineMedia GraphTimelineMedia) MediaItem {
 	return MediaItem{
-		TakenAt:       timelineMedia.TakenAt,
 		PK:            timelineMedia.PK,
 		ImageVersions: timelineMedia.ImageVersions.Candidates,
 		VideoVersions: timelineMedia.VideoVersions,
 		CarouselItems: timelineMedia.CarouselMedia,
+		TakenAt:       timelineMedia.TakenAt,
 	}
 }
 
 func HighlightsMediaToMediaItem(highlightsMedia GraphHighlightsMedia) MediaItem {
 	return MediaItem{
-		TakenAt:       highlightsMedia.TakenAt,
 		PK:            highlightsMedia.PK,
 		ImageVersions: highlightsMedia.ImageVersions.Candidates,
 		VideoVersions: highlightsMedia.VideoVersions,
+		TakenAt:       highlightsMedia.TakenAt,
 	}
 }

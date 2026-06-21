@@ -28,6 +28,15 @@ func TestDetectFormat(t *testing.T) {
 			expected: FormatPNG,
 		},
 		{
+			name: "HEIC magic bytes",
+			data: []byte{
+				0x00, 0x00, 0x00, 0x18,
+				'f', 't', 'y', 'p',
+				'h', 'e', 'i', 'c',
+			},
+			expected: FormatHEIC,
+		},
+		{
 			name: "WebP magic bytes",
 			data: []byte{
 				'R', 'I', 'F', 'F',
@@ -44,6 +53,15 @@ func TestDetectFormat(t *testing.T) {
 		{
 			name:     "empty buffer",
 			data:     []byte{},
+			expected: FormatUnknown,
+		},
+		{
+			name: "MP4 ftyp box (not HEIC)",
+			data: []byte{
+				0x00, 0x00, 0x00, 0x18,
+				'f', 't', 'y', 'p',
+				'i', 's', 'o', 'm',
+			},
 			expected: FormatUnknown,
 		},
 	}
@@ -65,6 +83,7 @@ func TestFormatExtension(t *testing.T) {
 	}{
 		{FormatJPEG, "jpg"},
 		{FormatPNG, "png"},
+		{FormatHEIC, "heic"},
 		{FormatWebP, "webp"},
 		{FormatUnknown, ""},
 	}

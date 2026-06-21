@@ -83,7 +83,7 @@ func (fileDownloader *FileDownloader) Download(ctx context.Context, url, directo
 		return DownloadResult{Path: destinationPath, Skipped: true}, nil
 	}
 
-	if extension == ".webp" {
+	if extension == ".heic" || extension == ".webp" {
 		jpegPath := filepath.Join(directory, nameWithoutExtension+".jpg")
 		if _, err := os.Stat(jpegPath); err == nil {
 			return DownloadResult{Path: jpegPath, Skipped: true}, nil
@@ -107,7 +107,7 @@ func (fileDownloader *FileDownloader) Download(ctx context.Context, url, directo
 
 func (fileDownloader *FileDownloader) writeFile(ctx context.Context, url, filename, nameWithoutExtension, extension, directory string, takenAt time.Time) (string, error) {
 	switch extension {
-	case ".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif":
+	case ".jpg", ".jpeg", ".png", ".heic", ".webp":
 		return fileDownloader.writeImage(ctx, url, nameWithoutExtension, directory, takenAt)
 	default:
 		return fileDownloader.writeStream(ctx, url, filename, directory, takenAt)
