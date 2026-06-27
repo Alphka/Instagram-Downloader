@@ -8,7 +8,7 @@
 
 # Production
 output/
-build/
+dist/
 
 # Debug
 npm-debug.log*
@@ -80,7 +80,6 @@ config.json
 tests/*
 !tests/index.test.js
 
-output/
 build/
 bin/
 

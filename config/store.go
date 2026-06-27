@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/zalando/go-keyring"
+	_ "modernc.org/sqlite"
 )
 
 const keyringService = "instadl"
@@ -48,7 +48,7 @@ func DefaultDirectory() (string, error) {
 func OpenStore(directory string) (*Store, error) {
 	path := filepath.Join(directory, "instadl.db")
 
-	database, err := sql.Open("sqlite3", path+"?_journal_mode=WAL&_synchronous=NORMAL")
+	database, err := sql.Open("sqlite", path+"?_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)")
 	if err != nil {
 		return nil, fmt.Errorf("opening database at %s: %w", path, err)
 	}
