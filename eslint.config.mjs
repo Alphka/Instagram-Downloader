@@ -447,6 +447,7 @@ export default defineConfig([
 				}
 			}],
 			"unicorn/no-array-sort": "off",
+			"unicorn/no-top-level-side-effects": "off",
 			"unicorn/prefer-string-replace-all": "off",
 			"unicorn/prefer-string-slice": "off",
 

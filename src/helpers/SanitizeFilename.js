@@ -1,5 +1,5 @@
 // eslint-disable-next-line no-control-regex
-const illegalCharPattern = /[/\\:*?"<>|\u0000-\u001F]/g
+const illegalCharPattern = /[/\\:*?"<>|\u{0000}-\u{001F}]/gu
 
 const reservedWindowsNames = new Set([
 	"CON",
@@ -30,7 +30,8 @@ const reservedWindowsNames = new Set([
 export default function SanitizeFilename(name){
 	let sanitized = name.replace(illegalCharPattern, "_").replace(/^[.\s]+|[.\s]+$/g, "")
 
-	const stem = sanitized.split(".")[0].toUpperCase()
+	const dotIndex = sanitized.indexOf(".")
+	const stem = (dotIndex === -1 ? sanitized : sanitized.substring(0, dotIndex)).toUpperCase()
 
 	if(reservedWindowsNames.has(stem)){
 		sanitized = "_" + sanitized

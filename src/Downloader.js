@@ -6,7 +6,7 @@ import { PassThrough } from "node:stream"
 import { spawn } from "cross-spawn"
 import axios, { AxiosHeaders } from "axios"
 import GetCorrectContent from "./helpers/GetCorrectContent.js"
-import SanitizeFilename from "./SanitizeFilename.js"
+import SanitizeFilename from "./helpers/SanitizeFilename.js"
 import ValidateUsername from "./helpers/ValidateUsername.js"
 import FindRegexArray from "./helpers/FindRegexArray.js"
 import GetURLFilename from "./helpers/GetURLFilename.js"
@@ -63,8 +63,8 @@ api.defaults.headers.common = {
 	Connection: "keep-alive",
 	Dnt: "1",
 	"Sec-Ch-Prefers-Color-Scheme": "dark",
-	"Sec-Ch-Ua": '"Chromium";v="148", "Google Chrome";v="148", "Not/A)Brand";v="99"',
-	"Sec-Ch-Ua-Full-Version-List": '"Chromium";v="148.0.7778.179", "Google Chrome";v="148.0.7778.179", "Not/A)Brand";v="99.0.0.0"',
+	"Sec-Ch-Ua": '"Google Chrome";v="149", "Chromium";v="149", "Not)A;Brand";v="24"',
+	"Sec-Ch-Ua-Full-Version-List": '"Google Chrome";v="149.0.7827.201", "Chromium";v="149.0.7827.201", "Not)A;Brand";v="24.0.0.0"',
 	"Sec-Ch-Ua-Mobile": "?0",
 	"Sec-Ch-Ua-Model": '""',
 	"Sec-Ch-Ua-Platform": '"Windows"',
@@ -72,7 +72,7 @@ api.defaults.headers.common = {
 	"Sec-Fetch-Dest": "empty",
 	"Sec-Fetch-Mode": "cors",
 	"Upgrade-Insecure-Requests": "1",
-	"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
+	"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
 }
 
 api.defaults.headers.get = {
@@ -90,9 +90,11 @@ const userIdRegexArray = [
 /** @param {import("fs").PathLike} path */
 async function exists(path){
 	return new Promise((resolve) => {
+		/* eslint-disable unicorn/prefer-await */
 		access(path, constants.F_OK)
 			.then(() => resolve(true))
 			.catch(() => resolve(false))
+		/* eslint-enable unicorn/prefer-await */
 	})
 }
 
@@ -721,13 +723,13 @@ export default class Downloader {
 
 		const shouldLimit = data && typeof data.limit === "number"
 
-		/** @type {boolean} */
-		let limited = false
-
 		if(shouldLimit && !data.limit) return {
 			urls: /** @type {Set<string>} */ (new Set),
 			limited: true
 		}
+
+		/** @type {boolean} */
+		let limited = false
 
 		/** @type {string | null | undefined} */
 		let ffmpegPath
@@ -930,7 +932,7 @@ export default class Downloader {
 			await QueueItemContentDownload(item, date, folder)
 		}
 
-		await Promise.all(Array.from(urls.entries()).map(async ([url, date]) => {
+		await Promise.all(Array.from(urls, async ([url, date]) => {
 			try{
 				const filename = GetURLFilename(url)
 
@@ -950,6 +952,10 @@ export default class Downloader {
 						Pragma: "no-cache",
 						Referer: BASE_URL + "/",
 						"Cache-Control": "no-cache",
+						"Sec-Ch-Prefers-Color-Scheme": undefined,
+						"Sec-Ch-Ua-Full-Version-List": undefined,
+						"Sec-Ch-Ua-Model": undefined,
+						"Sec-Ch-Ua-Platform-Version": undefined,
 						"Sec-Fetch-Mode": "cors",
 						"Sec-Fetch-Site": "cross-site",
 						"X-Csrftoken": undefined,
@@ -983,7 +989,7 @@ export default class Downloader {
 		const path = join(folder, filename)
 
 		// Skip re-download of already downloaded content
-		if(await exists(path) || (ext === ".webp" && await exists(join(folder, `${path}.jpg`)))){
+		if(await exists(path) || ((ext === ".webp" || ext === ".heic") && await exists(join(folder, `${path}.jpg`)))){
 			return path
 		}
 
@@ -1002,7 +1008,9 @@ export default class Downloader {
 			}
 
 			const { format } = await sharp(data).metadata()
-			const path = join(folder, `${name}.${format === "jpeg" ? "jpg" : format}`)
+
+			const extension = format === "jpeg" ? "jpg" : format === "heif" ? "heic" : format
+			const path = join(folder, `${name}.${extension}`)
 
 			await writeFile(path, data)
 			utimes(path, date, date)

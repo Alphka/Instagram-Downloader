@@ -8,7 +8,12 @@ const isTesting = process.env.npm_command === "test" || process.env.npm_lifecycl
 export default function Log(...args){
 	if(isTesting) return
 
-	const date = new Date().toLocaleString("pt-BR").split(", ")[1]
+	const date = new Date().toLocaleTimeString(undefined, {
+		hour: "2-digit",
+		minute: "2-digit",
+		second: "2-digit",
+		hour12: false
+	})
 
 	if(args.length === 1){
 		const arg = args[0]

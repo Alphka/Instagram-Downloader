@@ -95,7 +95,6 @@
 	"eslint.format.enable": true,
 
 	"editor.insertSpaces": false,
-	"editor.tabSize": 4,
 
 	"[javascript]": {
 		"editor.defaultFormatter": "dbaeumer.vscode-eslint"
@@ -114,23 +113,13 @@
 		"diffEditor.ignoreTrimWhitespace": false,
 		"editor.insertSpaces": true,
 		"editor.tabSize": 2,
-		"editor.wordWrap": "on",
-		"editor.unicodeHighlight.ambiguousCharacters": false,
-		"editor.unicodeHighlight.invisibleCharacters": false,
-		"editor.quickSuggestions": {
-			"comments": "on",
-			"strings": "on",
-			"other": "on"
-		},
 		"files.trimTrailingWhitespace": false
 	},
 
 	"[yaml]": {
 		"editor.insertSpaces": true,
 		"editor.tabSize": 2,
-		"editor.autoIndent": "advanced",
-		"diffEditor.ignoreTrimWhitespace": false,
-		"files.trimTrailingWhitespace": false
+		"editor.autoIndent": "advanced"
 	},
 
 	"npm-intellisense.importES6": true,

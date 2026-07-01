@@ -49,15 +49,7 @@ export default class Queue {
 	 * @returns {Promise<T>}
 	 */
 	async AwaitItem(item){
-		/** @type {(value: any) => void} */
-		let resolve
-		/** @type {(reason?: any) => void} */
-		let reject
-
-		const promise = new Promise((res, rej) => {
-			resolve = res
-			reject = rej
-		})
+		const { promise, resolve, reject } = Promise.withResolvers()
 
 		this._queueCallbacks.set(item, (value) => (value instanceof Error ? reject : resolve)(value))
 
