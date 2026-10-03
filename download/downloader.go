@@ -335,11 +335,7 @@ func (downloader *Downloader) downloadHighlights(ctx context.Context, userID, us
 	hasContent := false
 
 	for len(pending) > 0 && (!downloader.isLimited() || count < downloader.limit()) {
-		batchSize := 10
-		if batchSize > len(pending) {
-			batchSize = len(pending)
-		}
-
+		batchSize := min(10, len(pending))
 		batch := pending[:batchSize]
 		pending = pending[batchSize:]
 

@@ -250,8 +250,10 @@ func (store *Store) UpdateUserID(userID string) {
 }
 
 func (store *Store) UpdateSessionID(sessionID string) {
-	if sessionID != "" && sessionID != store.sessionID {
-		store.sessionID = sessionID
-		keyring.Set(keyringService, "sessionid", sessionID)
+	if sessionID == "" || sessionID == store.sessionID {
+		return
 	}
+
+	store.sessionID = sessionID
+	keyring.Set(keyringService, "sessionid", sessionID)
 }

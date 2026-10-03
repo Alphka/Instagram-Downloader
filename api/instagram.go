@@ -14,6 +14,12 @@ import (
 	"github.com/Alphka/Instagram-Downloader/log"
 )
 
+const (
+	docIDProfilePosts      = "28991540097136703"
+	docIDHighlightsTray    = "36997000523232338"
+	docIDHighlightsContent = "28325328583775973"
+)
+
 var userIDPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`\{"id":"(\d+)","profile_pic_url"`),
 	regexp.MustCompile(`\{"query_id":"\d+","user_id":"(\d+)"`),
@@ -166,6 +172,8 @@ func (instagram *Instagram) GetUserID(ctx context.Context, username string) (str
 }
 
 func (instagram *Instagram) GetTimeline(ctx context.Context, username, after string, count int) (*TimelineConnection, error) {
+	const friendlyName = "PolarisProfilePostsQuery"
+
 	variables := map[string]any{
 		"data": map[string]any{
 			"count":                             count,
@@ -175,8 +183,9 @@ func (instagram *Instagram) GetTimeline(ctx context.Context, username, after str
 			"include_reel_media_seen_timestamp": true,
 		},
 		"username": username,
-		"__relay_internal__pv__PolarisIsLoggedInrelayprovider":   true,
-		"__relay_internal__pv__PolarisShareSheetV3relayprovider": true,
+		"__relay_internal__pv__PolarisMultiCaptionCarouselEnabledrelayprovider":  true,
+		"__relay_internal__pv__PolarisShortDramaEnabledrelayprovider":            false,
+		"__relay_internal__pv__PolarisReelsRecoDebugOverlayEnabledrelayprovider": false,
 	}
 
 	if after != "" {
@@ -191,22 +200,19 @@ func (instagram *Instagram) GetTimeline(ctx context.Context, username, after str
 		return nil, fmt.Errorf("encoding timeline variables: %w", err)
 	}
 
-	form := url.Values{
-		"variables":                {string(variablesJSON)},
-		"server_timestamps":        {"true"},
-		"fb_api_caller_class":      {"RelayModern"},
-		"fb_api_req_friendly_name": {"PolarisProfilePostsQuery"},
-		"doc_id":                   {"24388485070759223"},
+	form, err := instagram.buildGraphQLForm(friendlyName, docIDProfilePosts, string(variablesJSON))
+	if err != nil {
+		return nil, err
 	}
 
+	headers := graphQLHeaders(
+		"https://www.instagram.com/"+username+"/",
+		friendlyName,
+		"xdt_api__v1__feed__user_timeline_graphql_connection",
+	)
+
 	var response QueryTimelineResponse
-	err = instagram.client.PostForm(ctx, endpointQuery, form, map[string]string{
-		"Accept":             "*/*",
-		"Priority":           "u=1, i",
-		"Referer":            "https://www.instagram.com/" + username + "/",
-		"X-Fb-Friendly-Name": "PolarisProfilePostsQuery",
-		"X-Root-Field-Name":  "xdt_api__v1__feed__user_timeline_graphql_connection",
-	}, &response)
+	err = instagram.client.PostForm(ctx, endpointQuery, form, headers, &response)
 	if err != nil {
 		return nil, err
 	}
@@ -215,13 +221,15 @@ func (instagram *Instagram) GetTimeline(ctx context.Context, username, after str
 }
 
 func (instagram *Instagram) GetHighlights(ctx context.Context, userID, username string) ([]HighlightNode, error) {
-	fbDtsg, err := instagram.store.GetFbDtsg()
-	if err != nil {
-		return nil, fmt.Errorf("reading fb_dtsg: %w", err)
-	}
-
 	if sessionID := instagram.store.GetSessionID(); sessionID == "" || sessionID == `""` {
 		return nil, fmt.Errorf("unauthenticated or login session expired; sessionid is missing")
+	}
+
+	const friendlyName = "PolarisProfileStoryHighlightsTrayContentQuery"
+
+	form, err := instagram.buildGraphQLForm(friendlyName, docIDHighlightsTray, fmt.Sprintf(`{"user_id":%q}`, userID))
+	if err != nil {
+		return nil, err
 	}
 
 	referer := "/"
@@ -229,26 +237,8 @@ func (instagram *Instagram) GetHighlights(ctx context.Context, userID, username 
 		referer = "https://www.instagram.com/" + username + "/"
 	}
 
-	form := url.Values{
-		"dpr":                      {"1"},
-		"fb_dtsg":                  {fbDtsg},
-		"fb_api_caller_class":      {"RelayModern"},
-		"fb_api_req_friendly_name": {"PolarisProfileStoryHighlightsTrayContentQuery"},
-		"variables":                {fmt.Sprintf(`{"user_id":%q}`, userID)},
-		"server_timestamps":        {"true"},
-		"doc_id":                   {"36997000523232338"},
-	}
-
 	var response QueryHighlightsResponse
-	err = instagram.client.PostForm(ctx, endpointQuery, form, map[string]string{
-		"Accept":             "*/*",
-		"Priority":           "u=1, i",
-		"Referer":            referer,
-		"Sec-Fetch-Dest":     "empty",
-		"Sec-Fetch-Mode":     "cors",
-		"Sec-Fetch-Site":     "same-origin",
-		"X-Fb-Friendly-Name": "PolarisProfileStoryHighlightsTrayContentQuery",
-	}, &response)
+	err = instagram.client.PostForm(ctx, endpointQuery, form, graphQLHeaders(referer, friendlyName, ""), &response)
 	if err != nil {
 		return nil, err
 	}
@@ -261,14 +251,57 @@ func (instagram *Instagram) GetHighlights(ctx context.Context, userID, username 
 	return nodes, nil
 }
 
+func (instagram *Instagram) buildGraphQLForm(friendlyName, docID, variables string) (url.Values, error) {
+	fbDtsg, err := instagram.store.GetFbDtsg()
+	if err != nil {
+		return nil, fmt.Errorf("reading fb_dtsg: %w", err)
+	}
+
+	return url.Values{
+		"dpr":                      {"1"},
+		"fb_dtsg":                  {fbDtsg},
+		"fb_api_caller_class":      {"RelayModern"},
+		"fb_api_req_friendly_name": {friendlyName},
+		"variables":                {variables},
+		"server_timestamps":        {"true"},
+		"doc_id":                   {docID},
+	}, nil
+}
+
+func graphQLHeaders(referer, friendlyName, rootFieldName string) map[string]string {
+	return map[string]string{
+		"Accept":             "*/*",
+		"Priority":           "u=1, i",
+		"Referer":            referer,
+		"Sec-Fetch-Dest":     "empty",
+		"Sec-Fetch-Mode":     "cors",
+		"Sec-Fetch-Site":     "same-origin",
+		"X-Fb-Friendly-Name": friendlyName,
+		"X-Root-Field-Name":  rootFieldName,
+	}
+}
+
 func (instagram *Instagram) GetHighlightsContent(ctx context.Context, reelIDs []string, username string) ([]HighlightReelNode, error) {
 	if len(reelIDs) == 0 {
 		return nil, nil
 	}
 
-	reelIDsJSON, err := json.Marshal(reelIDs)
+	const friendlyName = "PolarisStoriesV3HighlightsPageQuery"
+
+	variablesJSON, err := json.Marshal(map[string]any{
+		"initial_reel_id": reelIDs[0],
+		"reel_ids":        reelIDs,
+		"first":           len(reelIDs),
+		"last":            2,
+		"__relay_internal__pv__PolarisCommunityNoteStoriesLabelEnabledrelayprovider": true,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("encoding reel IDs: %w", err)
+		return nil, fmt.Errorf("encoding highlights content variables: %w", err)
+	}
+
+	form, err := instagram.buildGraphQLForm(friendlyName, docIDHighlightsContent, string(variablesJSON))
+	if err != nil {
+		return nil, err
 	}
 
 	referer := "/"
@@ -276,20 +309,10 @@ func (instagram *Instagram) GetHighlightsContent(ctx context.Context, reelIDs []
 		referer = "https://www.instagram.com/" + username + "/"
 	}
 
-	form := url.Values{
-		"variables": {fmt.Sprintf(
-			`{"after":null,"before":null,"first":%d,"initial_reel_id":%q,"reel_ids":%s,"last":null}`,
-			len(reelIDs),
-			reelIDs[0],
-			string(reelIDsJSON),
-		)},
-		"doc_id": {"25536143079310158"},
-	}
+	headers := graphQLHeaders(referer, friendlyName, "xdt_api__v1__feed__reels_media__connection")
 
 	var response HighlightsContentResponse
-	err = instagram.client.PostForm(ctx, endpointQuery, form, map[string]string{
-		"Referer": referer,
-	}, &response)
+	err = instagram.client.PostForm(ctx, endpointQuery, form, headers, &response)
 	if err != nil {
 		return nil, err
 	}

@@ -205,6 +205,16 @@ func (client *Client) do(request *http.Request) (*http.Response, []byte, error) 
 		log.Errorf("persisting cookies: %v", err)
 	}
 
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return response, body, fmt.Errorf(
+			"unexpected status %d (content-type %q, location %q): %s",
+			response.StatusCode,
+			response.Header.Get("Content-Type"),
+			response.Header.Get("Location"),
+			body[:min(len(body), 200)],
+		)
+	}
+
 	return response, body, nil
 }
 
@@ -222,6 +232,10 @@ func (client *Client) persistSetCookies(request *http.Request, response *http.Re
 	incoming := make(map[string]string)
 
 	for _, cookie := range response.Cookies() {
+		if client.debug {
+			log.Debug("Set-Cookie: %s (url: %s, cleared: %t)", cookie.Name, request.URL, cookie.Value == "")
+		}
+
 		switch cookie.Name {
 		case "th_eu_pref":
 			continue
@@ -232,9 +246,9 @@ func (client *Client) persistSetCookies(request *http.Request, response *http.Re
 				log.Debug("Instagram updated the csrftoken with: %s", cookie.Value)
 			}
 
-			client.store.UpdateToken(url.QueryEscape(cookie.Value))
+			client.store.UpdateToken(cookie.Value)
 		case "sessionid":
-			client.store.UpdateSessionID(url.QueryEscape(cookie.Value))
+			client.store.UpdateSessionID(cookie.Value)
 		case "ds_user_id":
 			if client.store.GetUserID() == cookie.Value {
 				continue
@@ -242,13 +256,28 @@ func (client *Client) persistSetCookies(request *http.Request, response *http.Re
 				log.Debug("Instagram updated the ds_user_id with: %s", cookie.Value)
 			}
 
-			client.store.UpdateUserID(url.QueryEscape(cookie.Value))
+			client.store.UpdateUserID(cookie.Value)
 		default:
-			incoming[cookie.Name] = url.QueryEscape(cookie.Value)
+			incoming[cookie.Name] = cookie.Value
 		}
 	}
 
 	return client.store.MergeCookies(incoming)
+}
+
+func decodeJSON(response *http.Response, body []byte, target any) error {
+	err := json.Unmarshal(body, target)
+	if err != nil {
+		return fmt.Errorf(
+			"decoding response (status %d, content-type %q): %w; body starts with: %s",
+			response.StatusCode,
+			response.Header.Get("Content-Type"),
+			err,
+			body[:min(len(body), 200)],
+		)
+	}
+
+	return nil
 }
 
 // Get performs a GET request and decodes the JSON response into target.
@@ -258,7 +287,7 @@ func (client *Client) Get(ctx context.Context, url string, overrides map[string]
 		return err
 	}
 
-	_, body, err := client.do(request)
+	response, body, err := client.do(request)
 
 	if err != nil {
 		return err
@@ -268,7 +297,7 @@ func (client *Client) Get(ctx context.Context, url string, overrides map[string]
 		return nil
 	}
 
-	return json.Unmarshal(body, target)
+	return decodeJSON(response, body, target)
 }
 
 // GetRaw performs a GET request and returns the raw response bytes.
@@ -290,6 +319,10 @@ func (client *Client) GetStream(ctx context.Context, url string, overrides map[s
 		return nil, err
 	}
 
+	if client.debug {
+		log.Debug("request: %s %s", request.Method, request.URL)
+	}
+
 	response, err := client.httpClient.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("http GET %s: %w", url, err)
@@ -297,6 +330,12 @@ func (client *Client) GetStream(ctx context.Context, url string, overrides map[s
 
 	if err := client.persistSetCookies(request, response); err != nil {
 		log.Errorf("persisting cookies: %v", err)
+	}
+
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		response.Body.Close()
+
+		return nil, fmt.Errorf("http GET %s: unexpected status %d", url, response.StatusCode)
 	}
 
 	return response.Body, nil
@@ -326,6 +365,10 @@ func (client *Client) GetPatternMatches(
 	request, err := client.buildRequest(ctx, http.MethodGet, rawURL, nil, overrides)
 	if err != nil {
 		return nil, err
+	}
+
+	if client.debug {
+		log.Debug("request: %s %s", request.Method, request.URL)
 	}
 
 	response, err := client.httpClient.Do(request)
@@ -413,7 +456,7 @@ func (client *Client) PostForm(ctx context.Context, url string, form url.Values,
 
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	_, responseBody, err := client.do(request)
+	response, body, err := client.do(request)
 	if err != nil {
 		return err
 	}
@@ -422,7 +465,7 @@ func (client *Client) PostForm(ctx context.Context, url string, form url.Values,
 		return nil
 	}
 
-	return json.Unmarshal(responseBody, target)
+	return decodeJSON(response, body, target)
 }
 
 // GetText performs a GET request and returns the raw response body as a string.
@@ -432,10 +475,10 @@ func (client *Client) GetText(ctx context.Context, url string, overrides map[str
 		return "", err
 	}
 
-	_, responseBody, err := client.do(request)
+	_, body, err := client.do(request)
 	if err != nil {
 		return "", err
 	}
 
-	return string(responseBody), nil
+	return string(body), nil
 }

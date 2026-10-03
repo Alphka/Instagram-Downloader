@@ -2,6 +2,10 @@
 	"cSpell.enabled": true,
 	"cSpell.language": "en",
 	"cSpell.words": [
+		"__relay_internal__pv__PolarisCommunityNoteStoriesLabelEnabledrelayprovider",
+		"__relay_internal__pv__PolarisMultiCaptionCarouselEnabledrelayprovider",
+		"__relay_internal__pv__PolarisReelsRecoDebugOverlayEnabledrelayprovider",
+		"__relay_internal__pv__PolarisShortDramaEnabledrelayprovider",
 		"Alphka",
 		"andybalholm",
 		"apng",
@@ -39,7 +43,6 @@
 		"mattn",
 		"modernc",
 		"mpdecimate",
-		"relayprovider",
 		"scanline",
 		"sessionid",
 		"Souza",

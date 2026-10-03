@@ -65,11 +65,11 @@ type TimelinePageInfo struct {
 }
 
 type TimelineConnection struct {
-	PageInfo TimelinePageInfo `json:"page_info"`
-	Edges    []struct {
+	Edges []struct {
 		Node   GraphTimelineMedia `json:"node"`
 		Cursor string             `json:"cursor"`
 	} `json:"edges"`
+	PageInfo TimelinePageInfo `json:"page_info"`
 }
 
 type QueryTimelineResponse struct {
@@ -79,7 +79,11 @@ type QueryTimelineResponse struct {
 }
 
 type HighlightNode struct {
-	ID         string `json:"id"`
+	ID   string `json:"id"`
+	User struct {
+		ID       string `json:"id"`
+		Username string `json:"username"`
+	} `json:"user"`
 	Title      string `json:"title"`
 	CoverMedia struct {
 		CroppedImageVersion struct {
@@ -95,6 +99,7 @@ type QueryHighlightsResponse struct {
 				Node   HighlightNode `json:"node"`
 				Cursor string        `json:"cursor"`
 			} `json:"edges"`
+			PageInfo TimelinePageInfo `json:"page_info"`
 		} `json:"highlights"`
 	} `json:"data"`
 }
