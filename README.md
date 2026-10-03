@@ -7,7 +7,7 @@ A program written in Go to download images and videos from Instagram.
 
 ### Requirements
 
-- [Go](https://go.dev/dl/) (minimum v1.25)
+- [Go](https://go.dev/dl/) (minimum v1.26.0)
 - [FFmpeg](https://ffmpeg.org/download.html) (optional, required for static video detection with `--with-thumbs`)
 
 <hr>
