@@ -135,9 +135,12 @@ type StoriesReel struct {
 	Items []FeedItem `json:"items"`
 }
 
-type StoriesResponse struct {
-	Reels      map[string]StoriesReel `json:"reels"`
-	ReelsMedia []StoriesReel          `json:"reels_media"`
+type QueryStoriesResponse struct {
+	Data struct {
+		ReelsMediaConnection struct {
+			ReelsMedia []StoriesReel `json:"reels_media"`
+		} `json:"xdt_api__v1__feed__reels_media"`
+	} `json:"data"`
 }
 
 type MediaItem struct {

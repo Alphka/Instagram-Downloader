@@ -15,6 +15,7 @@ import (
 )
 
 const (
+	docIDStories           = "29170422829314651"
 	docIDProfilePosts      = "28991540097136703"
 	docIDHighlightsTray    = "36997000523232338"
 	docIDHighlightsContent = "28325328583775973"
@@ -331,17 +332,30 @@ func (instagram *Instagram) GetHighlightsContent(ctx context.Context, reelIDs []
 }
 
 func (instagram *Instagram) GetStories(ctx context.Context, userID, username string) (*StoriesReel, error) {
-	rawURL := endpointReelsMedia + "?reel_ids=" + userID
+	const friendlyName = "PolarisStoriesV3ReelPageStandaloneQuery"
 
-	var response StoriesResponse
-	err := instagram.client.Get(ctx, rawURL, map[string]string{
-		"Accept":           "*/*",
-		"Referer":          "https://www.instagram.com/" + username + "/",
-		"Sec-Fetch-Site":   "same-origin",
-		"Sec-Fetch-Dest":   "empty",
-		"Sec-Fetch-Mode":   "cors",
-		"X-Requested-With": "XMLHttpRequest",
-	}, &response)
+	variablesJSON, err := json.Marshal(map[string]any{
+		"reel_ids_arr": []string{userID},
+		"__relay_internal__pv__PolarisCommunityNoteStoriesLabelEnabledrelayprovider": true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("encoding stories variables: %w", err)
+	}
+
+	form, err := instagram.buildGraphQLForm(friendlyName, docIDStories, string(variablesJSON))
+	if err != nil {
+		return nil, err
+	}
+
+	referer := "/"
+	if username != "" {
+		referer = "https://www.instagram.com/" + username + "/"
+	}
+
+	headers := graphQLHeaders(referer, friendlyName, "xdt_api__v1__feed__reels_media")
+
+	var response QueryStoriesResponse
+	err = instagram.client.PostForm(ctx, endpointQuery, form, headers, &response)
 	if err != nil {
 		return nil, err
 	}
@@ -351,14 +365,16 @@ func (instagram *Instagram) GetStories(ctx context.Context, userID, username str
 		log.Debug("GetStories response: %s", string(encoded))
 	}
 
-	if len(response.ReelsMedia) == 0 {
+	reelsMedia := response.Data.ReelsMediaConnection.ReelsMedia
+	if len(reelsMedia) == 0 {
 		return nil, nil
 	}
 
-	reel, exists := response.Reels[userID]
-	if !exists {
-		return nil, nil
+	for _, reel := range reelsMedia {
+		if reel.ID == userID {
+			return &reel, nil
+		}
 	}
 
-	return &reel, nil
+	return &reelsMedia[0], nil
 }
